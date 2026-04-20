@@ -175,6 +175,23 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .sync-btn.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
 .sync-btn.primary:hover{opacity:.85}
 
+
+/* SERIES TRACKER */
+.series-tracker{padding:.5rem 1.25rem .75rem;border-top:1px solid var(--border);background:var(--surface)}
+.series-row{display:flex;align-items:center;gap:8px;padding:.4rem 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.series-row:last-child{border-bottom:none}
+.serie-check{width:18px;height:18px;border:1.5px solid var(--border2);border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--surface);transition:all .15s;font-size:10px}
+.serie-check.done{background:var(--green);border-color:var(--green);color:white}
+.serie-label{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;min-width:52px}
+.serie-timer-btn{border:1px solid var(--border2);background:none;border-radius:16px;padding:2px 8px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;color:var(--muted);display:flex;align-items:center;gap:4px;white-space:nowrap;transition:all .15s}
+.serie-timer-btn:hover{border-color:var(--text);color:var(--text)}
+.serie-timer-btn.running{border-color:var(--red);color:var(--red)}
+.serie-timer-btn.rest{border-color:var(--gold);color:var(--gold)}
+.serie-timer-btn.rest.running{border-color:var(--gold);color:var(--gold);background:rgba(201,151,26,.08)}
+.serie-phase{font-size:10px;color:var(--muted);font-style:italic;flex:1;text-align:right}
+.serie-phase.active-phase{color:var(--tele)}
+
+.serie-info{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);background:var(--surface2);border-radius:5px;padding:3px 8px;white-space:normal;line-height:1.5;width:100%;margin-top:2px}
 /* Scrollbar */
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
@@ -243,11 +260,11 @@ const SESSIONS = {
       id:'matin_bureau', emoji:'🌅', title:'Matin — Activation lombaire',
       desc:'Avant le vélo · 15–18 min', duration:'15–18 min',
       exercises:[
-        {id:'b_m1', name:'Respiration diaphragmatique', desc:'Allongé, gonfle le ventre, tiens 5 s. Active le transverse.', reps:'10 souffles', sec:90, type:'gainage'},
+        {id:'b_m1', name:'Respiration diaphragmatique', desc:'Allongé, gonfle le ventre, tiens 5 s. Active le transverse.', reps:'10 souffles', sec:90, type:'gainage', serieInfo:'10 souffles · inspire 4 s · tenu 5 s · expire 6 s'},
         {id:'b_m2', name:'Knee-to-chest', desc:'Genoux ramenés vers la poitrine, maintiens doucement 30 s. Décompresse les lombaires.', reps:'3 × 30 s', sec:90, type:'etirement'},
-        {id:'b_m3', name:'Cat-Cow', desc:'À 4 pattes, alterne dos rond (expire) et dos creusé (inspire). Réchauffe la colonne.', reps:'10 rép. lentes', sec:120, type:'etirement'},
-        {id:'b_m4', name:'Bird Dog', desc:'Bras et jambe opposée tendus, tiens 3 s. Gainage profond anti-rotation.', reps:'3 × 8 /côté', sec:480, type:'gainage'},
-        {id:'b_m5', name:'Pont fessier', desc:'Hanches en l\'air, tiens 3 s. Renforce fessiers et lombaires.', reps:'3 × 10', sec:180, type:'gainage'},
+        {id:'b_m3', name:'Cat-Cow', desc:'À 4 pattes, alterne dos rond (expire) et dos creusé (inspire). Réchauffe la colonne.', reps:'10 rép. lentes', sec:120, type:'etirement', serieInfo:'10 cycles · 6 s par cycle · synchronisé respiration'},
+        {id:'b_m4', name:'Bird Dog', desc:'Bras et jambe opposée tendus, tiens 3 s. Gainage profond anti-rotation.', reps:'3 × 8 /côté', sec:480, type:'gainage', serieInfo:'8 reps/côté · tenu 3 s · montée 1 s'},
+        {id:'b_m5', name:'Pont fessier', desc:'Hanches en l\'air, tiens 3 s. Renforce fessiers et lombaires.', reps:'3 × 10', sec:180, type:'gainage', serieInfo:'10 reps · tenu 3 s · descente lente 2 s'},
       ]
     },
     {
@@ -278,10 +295,10 @@ const SESSIONS = {
       id:'matin_tele', emoji:'🌅', title:'Matin — Activation & gainage profond',
       desc:'Avant le début du travail · 20–22 min', duration:'20–22 min',
       exercises:[
-        {id:'t_m1', name:'Respiration + activation transverse', desc:'Expire fort, rentre le ventre, tiens 5 s. Active le corset naturel.', reps:'10 souffles', sec:90, type:'gainage'},
-        {id:'t_m2', name:'Dead Bug', desc:'Bras vers plafond, genoux 90°. Descends bras+jambe opposée. Dos plaqué au sol.', reps:'3 × 8 /côté', sec:480, type:'gainage'},
-        {id:'t_m3', name:'Bird Dog', desc:'À 4 pattes, étends bras et jambe opposée. Tiens 3 s. Ne laisse pas le bassin tourner.', reps:'3 × 8 /côté', sec:480, type:'gainage'},
-        {id:'t_m4', name:'Pont fessier + tenu', desc:'Hanches en l\'air, serre fessiers et abdos. Tiens 3 s. Descends lentement.', reps:'3 × 10', sec:180, type:'gainage'},
+        {id:'t_m1', name:'Respiration + activation transverse', desc:'Expire fort, rentre le ventre, tiens 5 s. Active le corset naturel.', reps:'10 souffles', sec:90, type:'gainage', serieInfo:'10 souffles · expire fort · tenu 5 s · relâche 4 s'},
+        {id:'t_m2', name:'Dead Bug', desc:'Bras vers plafond, genoux 90°. Descends bras+jambe opposée. Dos plaqué au sol.', reps:'3 × 8 /côté', sec:480, type:'gainage', serieInfo:'8 reps/côté · descente 3 s · remontée 2 s'},
+        {id:'t_m3', name:'Bird Dog', desc:'À 4 pattes, étends bras et jambe opposée. Tiens 3 s. Ne laisse pas le bassin tourner.', reps:'3 × 8 /côté', sec:480, type:'gainage', serieInfo:'8 reps/côté · tenu 3 s · contrôlé'},
+        {id:'t_m4', name:'Pont fessier + tenu', desc:'Hanches en l\'air, serre fessiers et abdos. Tiens 3 s. Descends lentement.', reps:'3 × 10', sec:180, type:'gainage', serieInfo:'10 reps · tenu 3 s · descente 2 s'},
         {id:'t_m5', name:'Planche avant', desc:'Avant-bras, corps aligné, ventre rentré. Respire normalement. Tiens sans apnée.', reps:'3 × 20 s', sec:120, type:'gainage'},
         {id:'t_m6', name:'Rotation lombaire douce', desc:'Genoux croisés de l\'autre côté, allongé. Décompression avant la journée assise.', reps:'2 × 40 s /côté', sec:160, type:'etirement'},
       ]
@@ -291,11 +308,11 @@ const SESSIONS = {
       desc:'Pause déjeuner · sans saut, sans impact · 20–23 min', duration:'20–23 min',
       exercises:[
         {id:'t_mi1', name:'Step touch dynamique', desc:'Pas latéraux rapides avec bras actifs (ouverture/fermeture en rythme). Cardio sans impact ni saut, silencieux, adapté appartement.', reps:'3 min', sec:180, type:'cardio'},
-        {id:'t_mi2', name:'Crunch bicycle', desc:'Coude vers genou opposé en alternance, lent et contrôlé. Pas de coup de nuque.', reps:'3 × 16 /côté', sec:360, type:'gainage'},
+        {id:'t_mi2', name:'Crunch bicycle', desc:'Coude vers genou opposé en alternance, lent et contrôlé. Pas de coup de nuque.', reps:'3 × 16 /côté', sec:360, type:'gainage', serieInfo:'16 reps/côté · 2 s par rotation · sans à-coup'},
         {id:'t_mi3', name:'Hollow Body Hold', desc:'Bras au-dessus de la tête, jambes tendues à 30°. Dos plaqué. Contraction intense.', reps:'4 × 15 s', sec:120, type:'gainage'},
         {id:'t_mi4', name:'Mountain Climbers sol lent', desc:'Position pompe basse, genoux vers poitrine en alternance très lentement (3 s /jambe). Aucun impact, gainage intense + rythme cardiaque modéré.', reps:'3 × 20 s', sec:120, type:'cardio'},
         {id:'t_mi5', name:'Side Plank', desc:'Avant-bras, corps aligné de côté, hanches levées. Travaille les obliques.', reps:'3 × 20 s /côté', sec:120, type:'gainage'},
-        {id:'t_mi6', name:'Superman allongé', desc:'À plat ventre, lève bras+jambe opposée. Renforce dos extenseur et fessiers.', reps:'3 × 10 (2 s)', sec:120, type:'gainage'},
+        {id:'t_mi6', name:'Superman allongé', desc:'À plat ventre, lève bras+jambe opposée. Renforce dos extenseur et fessiers.', reps:'3 × 10 (2 s)', sec:120, type:'gainage', serieInfo:'10 reps · tenu 2 s en haut · descente contrôlée'},
         {id:'t_mi7', name:'Étirement hip flexor debout', desc:'En fente, avance le bassin. Contre le raccourcissement par la position assise.', reps:'2 × 30 s /côté', sec:120, type:'etirement'},
       ]
     },
@@ -303,11 +320,11 @@ const SESSIONS = {
       id:'soir_tele', emoji:'🌙', title:'Soir — Gainage intense + décompression',
       desc:'Fin de journée · 22–25 min', duration:'22–25 min',
       exercises:[
-        {id:'t_s1', name:'Planche dynamique (épaule-épaule)', desc:'En planche, touche l\'épaule opposée en alternance. Anti-rotation des abdos.', reps:'3 × 10 tap', sec:150, type:'gainage'},
-        {id:'t_s2', name:'Crunch jambes tendues', desc:'Jambes à 90°, monte les épaules sans balancer. Contracte fort en haut.', reps:'3 × 12', sec:150, type:'gainage'},
-        {id:'t_s3', name:'Reverse Crunch', desc:'Lève le bassin en ramenant les genoux vers la poitrine. Abdos bas ciblés.', reps:'3 × 12', sec:150, type:'gainage'},
-        {id:'t_s4', name:'Side Plank avec dip', desc:'Descend et remonte la hanche. Obliques + renfort lombaire.', reps:'3 × 12 /côté', sec:240, type:'gainage'},
-        {id:'t_s5', name:'Dead Bug tempo lent', desc:'Même posture mais 5 s descente / 2 s pause / 3 s remontée. Difficulté par le tempo.', reps:'3 × 6 /côté', sec:360, type:'gainage'},
+        {id:'t_s1', name:'Planche dynamique (épaule-épaule)', desc:'En planche, touche l\'épaule opposée en alternance. Anti-rotation des abdos.', reps:'3 × 10 tap', sec:150, type:'gainage', serieInfo:'10 taps/côté · 2 s par tap · hanches stables'},
+        {id:'t_s2', name:'Crunch jambes tendues', desc:'Jambes à 90°, monte les épaules sans balancer. Contracte fort en haut.', reps:'3 × 12', sec:150, type:'gainage', serieInfo:'12 reps · montée 1 s · tenu 1 s · descente 2 s'},
+        {id:'t_s3', name:'Reverse Crunch', desc:'Lève le bassin en ramenant les genoux vers la poitrine. Abdos bas ciblés.', reps:'3 × 12', sec:150, type:'gainage', serieInfo:'12 reps · montée 1 s · descente contrôlée 2 s'},
+        {id:'t_s4', name:'Side Plank avec dip', desc:'Descend et remonte la hanche. Obliques + renfort lombaire.', reps:'3 × 12 /côté', sec:240, type:'gainage', serieInfo:'12 reps/côté · descente 2 s · remontée 1 s'},
+        {id:'t_s5', name:'Dead Bug tempo lent', desc:'Même posture mais 5 s descente / 2 s pause / 3 s remontée. Difficulté par le tempo.', reps:'3 × 6 /côté', sec:360, type:'gainage', serieInfo:'6 reps/côté · descente 5 s · pause 2 s · remontée 3 s'},
         {id:'t_s6', name:'Knee-to-chest + torsion spinale', desc:'Genoux poitrine puis torsion lombaire. Décompression complète.', reps:'2 × 40 s /côté', sec:160, type:'etirement'},
       ]
     },
@@ -319,9 +336,9 @@ const SESSIONS = {
         desc:'Activation articulaire + cardio doux · 10 min', duration:'10 min',
         exercises:[
           {id:'s_e1', name:'Marche sur place genoux hauts', desc:'Lève les genoux à hauteur de bassin en alternance, bras actifs. Monte le rythme cardiaque progressivement.', reps:'2 min', sec:120, type:'cardio'},
-          {id:'s_e2', name:'Cercles épaules avant/arrière', desc:'Bras tendus, grands cercles lents. Mobilise l\'articulation gléno-humérale avant l\'effort.', reps:'10 × chaque sens', sec:60, type:'etirement'},
-          {id:'s_e3', name:'Rotations hanches debout', desc:'Mains sur les hanches, grands cercles. Chauffe la ceinture lombaire et les fléchisseurs.', reps:'10 × chaque sens', sec:60, type:'etirement'},
-          {id:'s_e4', name:'Cat-Cow lent', desc:'À 4 pattes, dos rond / dos creusé. Réchauffe toute la colonne avant les charges.', reps:'10 répétitions', sec:90, type:'etirement'},
+          {id:'s_e2', name:'Cercles épaules avant/arrière', desc:'Bras tendus, grands cercles lents. Mobilise l\'articulation gléno-humérale avant l\'effort.', reps:'10 × chaque sens', sec:60, type:'etirement', serieInfo:'10 cercles avant + 10 arrière · amplitude max · lent'},
+          {id:'s_e3', name:'Rotations hanches debout', desc:'Mains sur les hanches, grands cercles. Chauffe la ceinture lombaire et les fléchisseurs.', reps:'10 × chaque sens', sec:60, type:'etirement', serieInfo:'10 rotations gauche + 10 droite · amplitude max'},
+          {id:'s_e4', name:'Cat-Cow lent', desc:'À 4 pattes, dos rond / dos creusé. Réchauffe toute la colonne avant les charges.', reps:'10 répétitions', sec:90, type:'etirement', serieInfo:'10 cycles · inspire dos creusé · expire dos rond · 5 s/cycle'},
           {id:'s_e5', name:'Step touch + bras overhead (V)', desc:'Pas latéraux avec bras qui montent en V au-dessus de la tête. Jambes légèrement écartées. Active tout le haut du corps.', reps:'2 min', sec:120, type:'cardio'},
         ]
       },
@@ -329,9 +346,9 @@ const SESSIONS = {
         id:'gainage_pre_sam', emoji:'🧱', title:'Gainage pré-musculation',
         desc:'Stabilise le dos avant les charges · 15 min', duration:'15 min',
         exercises:[
-          {id:'s_g1', name:'Dead Bug', desc:'Bras vers plafond, genoux 90°. Descends bras+jambe opposée lentement. Dos plaqué. Active les stabilisateurs profonds avant les haltères.', reps:'3 × 8 /côté', sec:480, type:'gainage'},
-          {id:'s_g2', name:'Bird Dog', desc:'À 4 pattes, bras et jambe opposée tendus 3 s. Prépare le gainage lombaire pour les exercices debout.', reps:'3 × 8 /côté', sec:480, type:'gainage'},
-          {id:'s_g3', name:'Pont fessier tenu', desc:'Hanches en l\'air, serre fessiers + abdos, tiens 3 s. Active les chaînes postérieures avant le rowing et les développés.', reps:'3 × 10', sec:180, type:'gainage'},
+          {id:'s_g1', name:'Dead Bug', desc:'Bras vers plafond, genoux 90°. Descends bras+jambe opposée lentement. Dos plaqué. Active les stabilisateurs profonds avant les haltères.', reps:'3 × 8 /côté', sec:480, type:'gainage', serieInfo:'8 reps/côté · descente 3 s · remontée 2 s'},
+          {id:'s_g2', name:'Bird Dog', desc:'À 4 pattes, bras et jambe opposée tendus 3 s. Prépare le gainage lombaire pour les exercices debout.', reps:'3 × 8 /côté', sec:480, type:'gainage', serieInfo:'8 reps/côté · tenu 3 s · retour contrôlé'},
+          {id:'s_g3', name:'Pont fessier tenu', desc:'Hanches en l\'air, serre fessiers + abdos, tiens 3 s. Active les chaînes postérieures avant le rowing et les développés.', reps:'3 × 10', sec:180, type:'gainage', serieInfo:'10 reps · tenu 3 s · descente 2 s'},
           {id:'s_g4', name:'Planche avant', desc:'Avant-bras, corps aligné, ventre rentré. Prépare la ceinture abdominale à stabiliser sous charge.', reps:'3 × 20 s', sec:120, type:'gainage'},
         ]
       },
@@ -341,21 +358,21 @@ const SESSIONS = {
         isMuscu: true,
         note:'Débutant / reprise : commencer léger (2 kg par haltère). Augmenter les disques uniquement quand les 12 reps sont fluides sur 3 séries. Repos 60–90 s entre séries.',
         exercises:[
-          {id:'s_mu1', name:'Développé couché à plat (banc)', desc:'Allongé sur le banc à plat, haltères au niveau de la poitrine, coudes à 45°. Pousse vers le haut en expirant. Pectoraux + triceps + épaules avant.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg'},
-          {id:'s_mu2', name:'Développé incliné (banc incliné ~30°)', desc:'Banc incliné, même mouvement. Cible le haut des pectoraux et les deltoïdes antérieurs. Charge identique ou légèrement réduite.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg'},
-          {id:'s_mu3', name:'Rowing un bras (appui sur banc)', desc:'Genou et main sur le banc, dos horizontal. Tire l\'haltère vers la hanche, coude rasant. Grand dorsal + rhomboïdes + biceps.', reps:'3 × 12 /côté', sec:480, type:'muscu', charge:'1×2 kg'},
-          {id:'s_mu4', name:'Élévations latérales debout', desc:'Debout, légèrement penché en avant, jambes écartées. Lève les bras en T jusqu\'à hauteur d\'épaules, descends lentement. Deltoïdes médians.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg'},
-          {id:'s_mu5', name:'Curl biceps debout', desc:'Debout, jambes écartées, haltères en supination. Fléchis les coudes sans bouger les épaules. Descends lentement (2 s). Biceps.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg'},
-          {id:'s_mu6', name:'Extension triceps couché (banc plat)', desc:'Allongé, haltères tendus vers le plafond. Fléchis uniquement les coudes pour descendre les haltères de chaque côté de la tête. Triceps longs.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg'},
-          {id:'s_mu7', name:'Oiseau incliné / Reverse fly (banc décliné léger)', desc:'Allongé face vers le bas sur banc légèrement décliné, bras pendants. Lève les bras en T. Trapèzes moyens + deltoïdes postérieurs. Clé pour la posture.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg'},
-          {id:'s_mu8', name:'Shrugs (haussements d\'épaules)', desc:'Debout jambes écartées, haltères le long du corps. Monte les épaules vers les oreilles, tiens 1 s, descends lentement. Trapèzes supérieurs.', reps:'3 × 12', sec:180, type:'muscu', charge:'2×2 kg'},
+          {id:'s_mu1', name:'Développé couché à plat (banc)', desc:'Allongé sur le banc à plat, haltères au niveau de la poitrine, coudes à 45°. Pousse vers le haut en expirant. Pectoraux + triceps + épaules avant.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg', serieInfo:'12 reps · 2 kg/bras · montée 1 s · descente 2 s'},
+          {id:'s_mu2', name:'Développé incliné (banc incliné ~30°)', desc:'Banc incliné, même mouvement. Cible le haut des pectoraux et les deltoïdes antérieurs. Charge identique ou légèrement réduite.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg', serieInfo:'12 reps · 2 kg/bras · montée 1 s · descente 2 s'},
+          {id:'s_mu3', name:'Rowing un bras (appui sur banc)', desc:'Genou et main sur le banc, dos horizontal. Tire l\'haltère vers la hanche, coude rasant. Grand dorsal + rhomboïdes + biceps.', reps:'3 × 12 /côté', sec:480, type:'muscu', charge:'1×2 kg', serieInfo:'12 reps/côté · 2 kg · tiré 1 s · tenu 1 s · descente 2 s'},
+          {id:'s_mu4', name:'Élévations latérales debout', desc:'Debout, légèrement penché en avant, jambes écartées. Lève les bras en T jusqu\'à hauteur d\'épaules, descends lentement. Deltoïdes médians.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg', serieInfo:'12 reps · 1 kg/bras · montée 2 s · descente 3 s'},
+          {id:'s_mu5', name:'Curl biceps debout', desc:'Debout, jambes écartées, haltères en supination. Fléchis les coudes sans bouger les épaules. Descends lentement (2 s). Biceps.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg', serieInfo:'12 reps · 2 kg/bras · montée 1 s · tenu 1 s · descente 2 s'},
+          {id:'s_mu6', name:'Extension triceps couché (banc plat)', desc:'Allongé, haltères tendus vers le plafond. Fléchis uniquement les coudes pour descendre les haltères de chaque côté de la tête. Triceps longs.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg', serieInfo:'12 reps · 1 kg/bras · descente 2 s · montée 1 s'},
+          {id:'s_mu7', name:'Oiseau incliné / Reverse fly (banc décliné léger)', desc:'Allongé face vers le bas sur banc légèrement décliné, bras pendants. Lève les bras en T. Trapèzes moyens + deltoïdes postérieurs. Clé pour la posture.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg', serieInfo:'12 reps · 1 kg/bras · montée 2 s · tenu 1 s · descente 2 s'},
+          {id:'s_mu8', name:'Shrugs (haussements d\'épaules)', desc:'Debout jambes écartées, haltères le long du corps. Monte les épaules vers les oreilles, tiens 1 s, descends lentement. Trapèzes supérieurs.', reps:'3 × 12', sec:180, type:'muscu', charge:'2×2 kg', serieInfo:'12 reps · 2 kg/bras · montée 1 s · tenu 1 s · descente 2 s'},
         ]
       },
       {
         id:'gainage_post_sam', emoji:'🧘', title:'Gainage post-effort + étirements',
         desc:'Retour au calme · récupération active · 15–20 min', duration:'15–20 min',
         exercises:[
-          {id:'s_p1', name:'Side Plank statique', desc:'Après l\'effort, le gainage latéral consolide ce que la musculation a travaillé. Corps aligné, hanches levées.', reps:'2 × 20 s /côté', sec:80, type:'gainage'},
+          {id:'s_p1', name:'Side Plank statique', desc:'Après l\'effort, le gainage latéral consolide ce que la musculation a travaillé. Corps aligné, hanches levées.', reps:'2 × 20 s /côté', sec:80, type:'gainage', serieInfo:'20 s/côté · respiration régulière'},
           {id:'s_p2', name:'Étirement pectoraux (angle mur)', desc:'Avant-bras contre un encadrement de porte, penche doucement le thorax vers l\'avant. Ouverture pectorale post-développé.', reps:'2 × 40 s /côté', sec:160, type:'etirement'},
           {id:'s_p3', name:'Étirement grand dorsal (bras overhead)', desc:'Debout, jambes écartées, agrippe un encadrement ou un mur en hauteur, laisse le poids du corps étirer le côté. Post-rowing.', reps:'2 × 40 s /côté', sec:160, type:'etirement'},
           {id:'s_p4', name:'Étirement trapèzes (inclinaison latérale tête)', desc:'Assis, penche la tête vers l\'épaule, aide doucement avec la main. Relâche les trapèzes chargés pendant les shrugs.', reps:'2 × 30 s /côté', sec:120, type:'etirement'},
@@ -374,7 +391,7 @@ const SESSIONS = {
           {id:'d_y1', name:'Respiration ujjayi allongé', desc:'Allongé, genoux fléchis. Inspire 4 s par le nez, expire 6 s lentement. Calme le système nerveux, prépare le corps.', reps:'2 min', sec:120, type:'yoga'},
           {id:'d_y2', name:'Pawanmuktasana (libération des vents)', desc:'Allongé, ramène un genou vers la poitrine, tiens. Alternative au toucher orteils. Décompresse le bas du dos en douceur.', reps:'3 × 30 s /côté', sec:180, type:'yoga'},
           {id:'d_y3', name:'Apanasana (deux genoux poitrine)', desc:'Les deux genoux ensemble vers la poitrine, bercement doux gauche-droite. Massage lombaire, accessible quelque soit la souplesse.', reps:'1 min', sec:60, type:'yoga'},
-          {id:'d_y4', name:'Marjariasana / Bitilasana (Cat-Cow yoga)', desc:'À 4 pattes, synchronise le mouvement avec la respiration. Plus lent que la version fitness. Mobilise toute la colonne vertébrale.', reps:'10 cycles lents', sec:120, type:'yoga'},
+          {id:'d_y4', name:'Marjariasana / Bitilasana (Cat-Cow yoga)', desc:'À 4 pattes, synchronise le mouvement avec la respiration. Plus lent que la version fitness. Mobilise toute la colonne vertébrale.', reps:'10 cycles lents', sec:120, type:'yoga', serieInfo:'10 cycles · 8 s par cycle · respiration guidée'},
           {id:'d_y5', name:'Balasana (posture de l\'enfant)', desc:'Genoux écartés à la largeur du tapis, orteils joints, assis sur les talons, bras tendus devant. Écarter les genoux évite la compression abdominale.', reps:'2 × 45 s', sec:90, type:'yoga'},
           {id:'d_y6', name:'Bhujangasana (cobra bas)', desc:'À plat ventre, mains sous les épaules, lève uniquement le haut du buste avec les muscles du dos (pas les bras). Ouvre les pectoraux et les lombaires.', reps:'3 × 30 s', sec:180, type:'yoga'},
           {id:'d_y7', name:'Setu Bandha (pont yoga)', desc:'Allongé, pieds à plat, monte les hanches en expirant. Plus long et plus conscient que le pont fitness. Ouvre la poitrine, renforce la chaîne postérieure.', reps:'3 × 40 s', sec:240, type:'yoga'},
@@ -772,10 +789,9 @@ function renderDayPanel(day) {
                   <span class="ex-reps">${ex.reps}</span>
                   ${ex.charge ? `<span class="charge-tag">${ex.charge}</span>` : ''}
                   <div class="type-dot dot-${ex.type}"></div>
-                  <button class="timer-btn" id="tbtn_${day.id}_${ex.id}" onclick="event.stopPropagation();toggleTimer('${day.id}_${ex.id}',${ex.sec})"
-                    >▶ <span id="tdisp_${day.id}_${ex.id}">${fmtTime(ex.sec)}</span></button>
                 </div>
-              </div>`;
+              </div>
+              ${isDurationEx(ex) ? renderSeriesTracker(day.id, ex) : renderRepTracker(day.id, ex)}`;
             }).join('')}
           </div>
         </div>`;
@@ -897,41 +913,246 @@ function saveJournalEntry(dayId) {
 }
 
 // ═══════════════════════════════════════════════
-//  TIMERS
+//  TIMERS & SERIES TRACKER
 // ═══════════════════════════════════════════════
 
 function fmtTime(s) {
   return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
 }
 
-function toggleTimer(id, total) {
-  const btn = document.getElementById('tbtn_'+id);
-  const disp = document.getElementById('tdisp_'+id);
-  if (!btn) return;
-  if (timers[id] && timers[id].running) {
-    clearInterval(timers[id].interval);
-    timers[id].running = false;
-    btn.classList.remove('running');
-    btn.innerHTML = `▶ <span id="tdisp_${id}">${fmtTime(timers[id].remaining)}</span>`;
-  } else {
-    if (!timers[id]) timers[id] = { remaining: total };
-    timers[id].running = true;
-    btn.classList.add('running');
-    btn.innerHTML = `■ <span id="tdisp_${id}">${fmtTime(timers[id].remaining)}</span>`;
-    timers[id].interval = setInterval(() => {
-      timers[id].remaining--;
-      const d = document.getElementById('tdisp_'+id);
-      if (d) d.textContent = fmtTime(Math.max(0, timers[id].remaining));
-      if (timers[id].remaining <= 0) {
-        clearInterval(timers[id].interval);
-        timers[id].running = false;
-        timers[id].remaining = total;
-        const b = document.getElementById('tbtn_'+id);
-        if (b) { b.classList.remove('running'); b.innerHTML = `▶ <span id="tdisp_${id}">${fmtTime(total)}</span>`; }
-      }
-    }, 1000);
-  }
+// ── Audio beeps via Web Audio API ──
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
 }
+function beep(freq, duration, vol=0.3, type='sine') {
+  try {
+    const ctx = getAudioCtx();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    o.start(ctx.currentTime); o.stop(ctx.currentTime + duration);
+  } catch(e) {}
+}
+// 3 bips distincts
+function beepStart()  { beep(880, 0.15, 0.4); }             // aigu court — début
+function beepHalf()   { beep(660, 0.2, 0.3); setTimeout(()=>beep(660,0.2,0.3),250); } // double médium — mi-temps
+function beepEnd()    { beep(440, 0.12, 0.4); setTimeout(()=>beep(440,0.12,0.4),180); setTimeout(()=>beep(440,0.25,0.5),360); } // triple grave — fin
+function beepRestEnd(){ beep(880, 0.12, 0.4); setTimeout(()=>beep(1100,0.3,0.5),200); } // aigu montant — fin repos
+
+// ── Detect duration-based exercises ──
+function isDurationEx(ex) {
+  return /\d+\s*s/.test(ex.reps) || /\d+\s*min/.test(ex.reps);
+}
+
+// ── Parse reps string → { sets, secPerSet, restSec } ──
+function parseReps(reps, totalSec) {
+  // Patterns: "3 × 30 s /côté", "2 × 45 s", "4 × 15 s", "3 min", "2 min", "1 min", "5 min"
+  // For /côté: totalSec already accounts for both sides
+  const setMatch = reps.match(/^(\d+)\s*[×x]/);
+  const sets = setMatch ? parseInt(setMatch[1]) : 1;
+  const secPerSet = sets > 0 ? Math.round(totalSec / sets) : totalSec;
+  const restSec = secPerSet >= 40 ? 20 : 15; // shorter rest for short holds
+  return { sets, secPerSet, restSec };
+}
+
+// ── Render series tracker HTML ──
+function renderSeriesTracker(dayId, ex) {
+  const { sets, secPerSet, restSec } = parseReps(ex.reps, ex.sec);
+  let html = `<div class="series-tracker" id="st_${dayId}_${ex.id}">`;
+  for (let i = 0; i < sets; i++) {
+    const sid = `${dayId}_${ex.id}_s${i}`;
+    html += `<div class="series-row" id="srow_${sid}">
+      <div class="serie-check" id="schk_${sid}" onclick="toggleSerieCheck('${sid}')"></div>
+      <span class="serie-label">Série ${i+1}/${sets}</span>
+      <button class="serie-timer-btn" id="stbtn_${sid}" onclick="startSerieTimer('${sid}',${secPerSet},${restSec},${i},${sets})">
+        ▶ <span id="stdisp_${sid}">${fmtTime(secPerSet)}</span>
+      </button>
+      <span class="serie-phase" id="sphase_${sid}"></span>
+    </div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+// ── Render rep-based series tracker (checkboxes + rest timer) ──
+function parseRepSets(reps) {
+  // Only treat as multiple sets if pattern is "N × NUMBER" (digit after the ×)
+  // e.g. "3 × 12" → 3 sets, "3 × 8 /côté" → 3 sets
+  // but "10 × chaque sens", "10 répétitions", "10 souffles" → 1 set
+  const m = reps.match(/^(\d+)\s*[×x]\s*(\d)/);
+  return m ? parseInt(m[1]) : 1;
+}
+
+function renderRepTracker(dayId, ex) {
+  const sets = parseRepSets(ex.reps);
+  const restSec = 60;
+  const info = ex.serieInfo || '';
+  let html = `<div class="series-tracker" id="st_${dayId}_${ex.id}">`;
+  for (let i = 0; i < sets; i++) {
+    const sid = `${dayId}_${ex.id}_s${i}`;
+    const isLast = i === sets - 1;
+    html += `<div class="series-row" id="srow_${sid}">
+      <div class="serie-check" id="schk_${sid}" onclick="repSerieCheck('${sid}',${restSec},${isLast})"></div>
+      <span class="serie-label">Série ${i+1}/${sets}</span>
+      <span class="serie-phase" id="sphase_${sid}"></span>
+      <span id="stdisp_${sid}" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);flex-shrink:0;display:none"></span>
+      ${info ? `<span class="serie-info">${info}</span>` : ''}
+    </div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function repSerieCheck(sid, restSec, isLast) {
+  const chk = document.getElementById('schk_'+sid);
+  const phase = document.getElementById('sphase_'+sid);
+  const disp = document.getElementById('stdisp_'+sid);
+  if (!chk) return;
+
+  // Toggle off if already checked and no timer running
+  if (chk.classList.contains('done') && (!serieTimers[sid] || !serieTimers[sid].interval)) {
+    chk.classList.remove('done'); chk.textContent = '';
+    if (phase) { phase.textContent = ''; phase.className = 'serie-phase'; }
+    if (disp) disp.style.display = 'none';
+    return;
+  }
+
+  // Stop rest timer if running
+  if (serieTimers[sid] && serieTimers[sid].interval) {
+    clearInterval(serieTimers[sid].interval);
+    serieTimers[sid] = null;
+    if (disp) disp.style.display = 'none';
+    if (phase) { phase.textContent = ''; phase.className = 'serie-phase'; }
+    return;
+  }
+
+  // Check the serie
+  chk.classList.add('done'); chk.textContent = '✓';
+  beepEnd();
+
+  // No rest after last set
+  if (isLast) {
+    if (phase) { phase.textContent = 'Exercice terminé !'; phase.className = 'serie-phase active-phase'; }
+    return;
+  }
+
+  // Start rest countdown
+  if (phase) { phase.textContent = 'Repos…'; phase.className = 'serie-phase'; }
+  if (disp) { disp.style.display = 'inline'; disp.textContent = fmtTime(restSec); }
+
+  serieTimers[sid] = { interval: null, remaining: restSec };
+  serieTimers[sid].interval = setInterval(() => {
+    const st = serieTimers[sid];
+    if (!st) return;
+    st.remaining--;
+    const d = document.getElementById('stdisp_'+sid);
+    if (d) d.textContent = fmtTime(Math.max(0, st.remaining));
+    if (st.remaining <= 0) {
+      clearInterval(st.interval);
+      serieTimers[sid] = null;
+      beepRestEnd();
+      if (d) d.style.display = 'none';
+      const ph = document.getElementById('sphase_'+sid);
+      if (ph) { ph.textContent = 'Série suivante !'; ph.className = 'serie-phase active-phase'; }
+      setTimeout(() => {
+        const ph2 = document.getElementById('sphase_'+sid);
+        if (ph2 && ph2.textContent === 'Série suivante !') { ph2.textContent = ''; ph2.className = 'serie-phase'; }
+      }, 3000);
+    }
+  }, 1000);
+}
+
+// ── Series timer state ──
+const serieTimers = {};
+
+function startSerieTimer(sid, secPerSet, restSec, serieIdx, totalSets) {
+  const btn = document.getElementById('stbtn_'+sid);
+  const disp = document.getElementById('stdisp_'+sid);
+  const phase = document.getElementById('sphase_'+sid);
+  if (!btn) return;
+
+  // Stop if already running
+  if (serieTimers[sid] && serieTimers[sid].interval) {
+    clearInterval(serieTimers[sid].interval);
+    serieTimers[sid] = null;
+    btn.classList.remove('running','rest');
+    btn.innerHTML = `▶ <span id="stdisp_${sid}">${fmtTime(secPerSet)}</span>`;
+    if (phase) phase.textContent = '';
+    return;
+  }
+
+  // Init
+  serieTimers[sid] = { interval: null, remaining: secPerSet, phase: 'work' };
+  btn.classList.add('running');
+  if (phase) { phase.textContent = 'En cours…'; phase.className = 'serie-phase active-phase'; }
+
+  // Bip de début
+  beepStart();
+
+  serieTimers[sid].interval = setInterval(() => {
+    const st = serieTimers[sid];
+    if (!st) return;
+
+    if (st.phase === 'work') {
+      st.remaining--;
+      const d = document.getElementById('stdisp_'+sid);
+      if (d) d.textContent = fmtTime(Math.max(0, st.remaining));
+
+      // Bip mi-temps
+      if (st.remaining === Math.floor(secPerSet / 2)) beepHalf();
+
+      // Fin du travail
+      if (st.remaining <= 0) {
+        beepEnd();
+        // Auto-cocher la série
+        const chk = document.getElementById('schk_'+sid);
+        if (chk && !chk.classList.contains('done')) {
+          chk.classList.add('done'); chk.textContent = '✓';
+        }
+        // Passer en phase repos
+        st.phase = 'rest';
+        st.remaining = restSec;
+        btn.classList.remove('running');
+        btn.classList.add('rest');
+        const pb = document.getElementById('stbtn_'+sid);
+        if (pb) pb.innerHTML = `⏸ <span id="stdisp_${sid}">${fmtTime(restSec)}</span>`;
+        if (phase) { phase.textContent = 'Repos…'; phase.className = 'serie-phase'; }
+      }
+    } else if (st.phase === 'rest') {
+      st.remaining--;
+      const d = document.getElementById('stdisp_'+sid);
+      if (d) d.textContent = fmtTime(Math.max(0, st.remaining));
+
+      // Fin du repos
+      if (st.remaining <= 0) {
+        beepRestEnd();
+        clearInterval(st.interval);
+        serieTimers[sid] = null;
+        const pb = document.getElementById('stbtn_'+sid);
+        if (pb) {
+          pb.classList.remove('rest');
+          pb.innerHTML = `✓ <span id="stdisp_${sid}">0:00</span>`;
+        }
+        if (phase) { phase.textContent = 'Série suivante !'; phase.className = 'serie-phase active-phase'; }
+      }
+    }
+  }, 1000);
+}
+
+function toggleSerieCheck(sid) {
+  const chk = document.getElementById('schk_'+sid);
+  if (!chk) return;
+  chk.classList.toggle('done');
+  chk.textContent = chk.classList.contains('done') ? '✓' : '';
+}
+
+// ── Fallback timer (unused but kept for safety) ──
+function toggleTimer(id, total) {}
 
 // ═══════════════════════════════════════════════
 //  WEEK NAV
