@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Programme Semaine — Dos & Forme</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#F4F2ED;
+  --surface:#FFFFFF;
+  --surface2:#EDEAE3;
+  --surface3:#E5E2DA;
+  --border:rgba(0,0,0,0.07);
+  --border2:rgba(0,0,0,0.13);
+  --text:#1C1A16;
+  --muted:#7A776F;
+  --muted2:#AAA79F;
+  --bureau:#C05A20;
+  --bureau-bg:#FDF1EA;
+  --tele:#2E6E4E;
+  --tele-bg:#E8F4EE;
+  --weekend:#4A4FA8;
+  --weekend-bg:#EEEFFE;
+  --velo:#B8890A;
+  --velo-bg:#FDF5E0;
+  --gold:#C9971A;
+  --green:#2E7D52;
+  --red:#B84040;
+  --radius:14px;
+  --radius-sm:8px;
+}
+
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:0}
+
+/* ── TOP NAV ── */
+.topbar{background:var(--text);color:#F4F2ED;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.topbar-title{font-size:15px;font-weight:600;letter-spacing:-0.3px}
+.topbar-sub{font-size:11px;opacity:.55;font-family:'DM Mono',monospace;margin-top:2px}
+.week-selector{display:flex;align-items:center;gap:10px}
+.week-btn{background:rgba(255,255,255,0.12);border:none;color:#F4F2ED;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:13px;transition:background .15s}
+.week-btn:hover{background:rgba(255,255,255,0.22)}
+.week-label{font-family:'DM Mono',monospace;font-size:12px;opacity:.8;min-width:90px;text-align:center}
+
+/* ── DAY TABS ── */
+.day-tabs{display:flex;gap:0;overflow-x:auto;background:var(--surface);border-bottom:1px solid var(--border2);padding:0 1rem;scrollbar-width:none}
+.day-tabs::-webkit-scrollbar{display:none}
+.day-tab{flex-shrink:0;padding:.9rem 1.1rem .75rem;cursor:pointer;border-bottom:3px solid transparent;font-size:13px;font-weight:500;color:var(--muted);transition:all .15s;white-space:nowrap;position:relative}
+.day-tab:hover{color:var(--text)}
+.day-tab.active{color:var(--text);border-bottom-color:var(--text)}
+.day-tab .day-dot{width:6px;height:6px;border-radius:50%;position:absolute;top:10px;right:8px}
+.day-tab .done-count{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted2);display:block;margin-top:1px;text-align:center}
+
+/* ── DAY PANEL ── */
+.day-panels{padding:1.25rem 1.25rem 4rem}
+.day-panel{display:none}
+.day-panel.active{display:block}
+
+/* ── DAY HEADER ── */
+.day-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.25rem;gap:12px;flex-wrap:wrap}
+.day-title-block{}
+.day-name{font-size:22px;font-weight:600;letter-spacing:-0.5px}
+.day-type-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;margin-top:5px;text-transform:uppercase;letter-spacing:.4px}
+.badge-bureau{background:var(--bureau-bg);color:var(--bureau)}
+.badge-tele{background:var(--tele-bg);color:var(--tele)}
+.badge-weekend{background:var(--weekend-bg);color:var(--weekend)}
+
+/* Stats journée */
+.day-stats{display:flex;gap:8px;flex-wrap:wrap}
+.stat-pill{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.6rem .9rem;text-align:center;min-width:72px}
+.stat-val{font-size:17px;font-weight:600;letter-spacing:-0.3px;line-height:1}
+.stat-lbl{font-size:10px;color:var(--muted);margin-top:3px;font-family:'DM Mono',monospace}
+
+/* ── SESSION CARD ── */
+.session-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:1rem}
+.session-head{padding:1rem 1.25rem .75rem;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border)}
+.session-emoji{font-size:22px;flex-shrink:0}
+.session-info{flex:1}
+.session-title{font-size:15px;font-weight:600;letter-spacing:-0.2px}
+.session-meta{font-size:12px;color:var(--muted);margin-top:2px;font-weight:300}
+.session-duration{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);flex-shrink:0}
+.session-done-badge{font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;background:#E8F5EE;color:#2E7D52;display:none}
+.session-done-badge.visible{display:inline-block}
+
+/* ── EXERCISE ROW ── */
+.ex-list{padding:.5rem 0}
+.ex-row{display:flex;align-items:flex-start;gap:10px;padding:.7rem 1.25rem;transition:background .1s;cursor:pointer}
+.ex-row:hover{background:var(--surface2)}
+.ex-row.checked{opacity:.55}
+.ex-check{width:20px;height:20px;border:1.5px solid var(--border2);border-radius:5px;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;transition:all .15s;background:var(--surface)}
+.ex-row.checked .ex-check{background:var(--green);border-color:var(--green);color:white;font-size:11px}
+.ex-body{flex:1}
+.ex-name{font-size:13.5px;font-weight:500}
+.ex-desc{font-size:11.5px;color:var(--muted);line-height:1.5;font-weight:300;margin-top:2px}
+.ex-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
+.ex-reps{font-family:'DM Mono',monospace;font-size:11px;background:var(--surface2);padding:2px 8px;border-radius:5px;white-space:nowrap}
+.type-dot{width:6px;height:6px;border-radius:50%;margin-top:6px}
+.dot-gainage{background:#4A5FA8}
+.dot-etirement{background:#2E6E4E}
+.dot-cardio{background:#B84040}
+.dot-velo{background:#B8890A}
+.dot-muscu{background:#7A4FA8}
+.dot-yoga{background:#C0607A}
+
+/* Timer */
+.timer-btn{border:1px solid var(--border2);background:none;border-radius:20px;padding:2px 9px;font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;color:var(--muted);display:flex;align-items:center;gap:4px;white-space:nowrap;transition:all .15s}
+.timer-btn:hover{border-color:var(--text);color:var(--text)}
+.timer-btn.running{border-color:var(--red);color:var(--red)}
+
+/* ── VELO CARD ── */
+.velo-card{background:var(--velo-bg);border:1px solid rgba(184,137,10,.2);border-radius:var(--radius);padding:1rem 1.25rem;margin-bottom:1rem;display:flex;gap:14px;align-items:flex-start}
+.velo-icon{font-size:28px}
+.velo-info{flex:1}
+.velo-title{font-size:14px;font-weight:600;color:var(--velo)}
+.velo-sub{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5}
+.velo-stats{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.velo-stat{background:rgba(255,255,255,.6);border:1px solid rgba(184,137,10,.15);border-radius:8px;padding:.4rem .8rem;font-size:11px}
+.velo-stat strong{font-family:'DM Mono',monospace;font-size:13px;display:block;color:var(--velo);line-height:1}
+.velo-check-row{display:flex;align-items:center;gap:8px;margin-top:10px}
+.velo-check-label{font-size:12px;color:var(--muted)}
+.velo-checkbox{width:18px;height:18px;border:1.5px solid rgba(184,137,10,.4);border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;background:white;transition:all .15s;flex-shrink:0}
+.velo-checkbox.checked{background:var(--velo);border-color:var(--velo);color:white;font-size:10px}
+
+/* ── JOURNAL ── */
+.journal-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-top:1rem}
+.journal-title{font-size:13px;font-weight:600;margin-bottom:.75rem;display:flex;align-items:center;gap:6px}
+.rating-row{display:flex;align-items:center;gap:6px;margin-bottom:.75rem;flex-wrap:wrap}
+.rating-lbl{font-size:12px;color:var(--muted);min-width:80px}
+.star-btn{font-size:20px;cursor:pointer;opacity:.3;transition:all .15s;border:none;background:none;padding:0 1px;line-height:1}
+.star-btn.active{opacity:1}
+.feeling-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.75rem}
+.feel-btn{border:1px solid var(--border2);border-radius:20px;padding:4px 12px;font-size:12px;cursor:pointer;background:none;color:var(--muted);transition:all .15s;white-space:nowrap}
+.feel-btn:hover{background:var(--surface2)}
+.feel-btn.selected{background:var(--text);color:var(--bg);border-color:var(--text)}
+.journal-textarea{width:100%;border:1px solid var(--border2);border-radius:var(--radius-sm);padding:.7rem .9rem;font-family:'DM Sans',sans-serif;font-size:13px;resize:vertical;min-height:72px;background:var(--bg);color:var(--text);outline:none;line-height:1.5}
+.journal-textarea:focus{border-color:var(--text)}
+.save-btn{margin-top:.6rem;width:100%;padding:.6rem;background:var(--text);color:var(--bg);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:opacity .15s}
+.save-btn:hover{opacity:.85}
+.save-confirm{font-size:11px;color:var(--green);font-family:'DM Mono',monospace;margin-top:4px;opacity:0;transition:opacity .3s}
+.save-confirm.show{opacity:1}
+
+/* ── PROGRESS OVERVIEW ── */
+.overview-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:.75rem 1.25rem;display:flex;align-items:center;gap:12px;overflow-x:auto;scrollbar-width:none}
+.overview-bar::-webkit-scrollbar{display:none}
+.ov-day{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.ov-ring{width:34px;height:34px;border-radius:50%;border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:10px;font-family:'DM Mono',monospace;color:var(--muted);transition:all .2s}
+.ov-ring.partial{border-color:var(--gold);color:var(--gold)}
+.ov-ring.full{border-color:var(--green);background:#E8F5EE;color:var(--green)}
+.ov-ring.active-day{box-shadow:0 0 0 2px var(--text)}
+.ov-label{font-size:9px;font-family:'DM Mono',monospace;color:var(--muted2);text-transform:uppercase}
+
+/* ── WEEKEND COMING SOON ── */
+.soon-card{background:var(--weekend-bg);border:1px dashed rgba(74,79,168,.3);border-radius:var(--radius);padding:2rem 1.5rem;text-align:center;margin-bottom:1rem}
+.soon-icon{font-size:36px;margin-bottom:.75rem}
+.soon-title{font-size:15px;font-weight:600;color:var(--weekend);margin-bottom:.5rem}
+.soon-sub{font-size:13px;color:var(--muted);line-height:1.6}
+.equipment-list{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:1rem}
+.eq-tag{background:white;border:1px solid rgba(74,79,168,.2);border-radius:20px;padding:4px 12px;font-size:11px;color:var(--weekend)}
+
+
+/* DRIVE SYNC */
+.sync-bar{display:flex;align-items:center;gap:10px;padding:.6rem 1.25rem;background:var(--surface);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)}
+.sync-status{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+.sync-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--muted2)}
+.sync-dot.connected{background:#2E7D52}
+.sync-dot.syncing{background:var(--gold);animation:pulse .8s infinite alternate}
+.sync-dot.error{background:var(--red)}
+@keyframes pulse{from{opacity:.4}to{opacity:1}}
+.sync-lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sync-btn{font-size:11px;padding:4px 12px;border:1px solid var(--border2);border-radius:20px;background:none;cursor:pointer;color:var(--muted);white-space:nowrap;transition:all .15s;flex-shrink:0}
+.sync-btn:hover{background:var(--surface2);color:var(--text)}
+.sync-btn.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
+.sync-btn.primary:hover{opacity:.85}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+.note-banner{background:#FDF5E0;border:1px solid rgba(184,137,10,.2);border-radius:10px;padding:.65rem 1rem;margin:.5rem 1.25rem .25rem;font-size:12px;color:#7A5800;line-height:1.5;font-style:italic}
+.charge-tag{font-family:'DM Mono',monospace;font-size:10px;background:#F0EAFA;color:#6A35A8;border:1px solid rgba(106,53,168,.15);padding:2px 7px;border-radius:5px;white-space:nowrap}
+.badge-yoga{background:#FAEAF0;color:#A03060}
+.badge-muscu{background:#F0EAFA;color:#6A35A8}
+</style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div>
+    <div class="topbar-title">Programme Semaine</div>
+    <div class="topbar-sub" id="week-display">Semaine 0</div>
+  </div>
+  <div class="week-selector">
+    <button class="week-btn" onclick="changeWeek(-1)">‹</button>
+    <span class="week-label" id="week-range-label"></span>
+    <button class="week-btn" onclick="changeWeek(1)">›</button>
+  </div>
+</div>
+
+<!-- SYNC BAR -->
+<div class="sync-bar" id="sync-bar">
+  <div class="sync-status">
+    <div class="sync-dot" id="sync-dot"></div>
+    <span class="sync-lbl" id="sync-label">Non connecté — données locales uniquement</span>
+  </div>
+  <button class="sync-btn primary" id="sync-btn" onclick="handleSyncBtn()">Connecter Drive</button>
+</div>
+
+<!-- OVERVIEW RINGS -->
+<div class="overview-bar" id="overview-bar"></div>
+
+<!-- DAY TABS -->
+<div class="day-tabs" id="day-tabs"></div>
+
+<!-- PANELS -->
+<div class="day-panels" id="day-panels"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════
+
+const DAYS = [
+  { id:'lun', label:'Lun', fullName:'Lundi', type:'bureau' },
+  { id:'mar', label:'Mar', fullName:'Mardi', type:'tele' },
+  { id:'mer', label:'Mer', fullName:'Mercredi', type:'bureau' },
+  { id:'jeu', label:'Jeu', fullName:'Jeudi', type:'tele' },
+  { id:'ven', label:'Ven', fullName:'Vendredi', type:'bureau' },
+  { id:'sam', label:'Sam', fullName:'Samedi', type:'weekend' },
+  { id:'dim', label:'Dim', fullName:'Dimanche', type:'weekend' },
+];
+
+const TYPE_LABELS = { bureau:'Bureau + Vélo', tele:'Télétravail', weekend:'Week-end' };
+const TYPE_COLORS = { bureau:'bureau', tele:'tele', weekend:'weekend' };
+
+// Séances selon type de jour
+const SESSIONS = {
+  bureau: [
+    {
+      id:'matin_bureau', emoji:'🌅', title:'Matin — Activation lombaire',
+      desc:'Avant le vélo · 15–18 min', duration:'15–18 min',
+      exercises:[
+        {id:'b_m1', name:'Respiration diaphragmatique', desc:'Allongé, gonfle le ventre, tiens 5 s. Active le transverse.', reps:'10 souffles', sec:90, type:'gainage'},
+        {id:'b_m2', name:'Knee-to-chest', desc:'Genoux ramenés vers la poitrine, maintiens doucement 30 s. Décompresse les lombaires.', reps:'3 × 30 s', sec:90, type:'etirement'},
+        {id:'b_m3', name:'Cat-Cow', desc:'À 4 pattes, alterne dos rond (expire) et dos creusé (inspire). Réchauffe la colonne.', reps:'10 rép. lentes', sec:120, type:'etirement'},
+        {id:'b_m4', name:'Bird Dog', desc:'Bras et jambe opposée tendus, tiens 3 s. Gainage profond anti-rotation.', reps:'3 × 8 /côté', sec:480, type:'gainage'},
+        {id:'b_m5', name:'Pont fessier', desc:'Hanches en l\'air, tiens 3 s. Renforce fessiers et lombaires.', reps:'3 × 10', sec:180, type:'gainage'},
+      ]
+    },
+    {
+      id:'velo_matin', emoji:'🚴', title:'Vélo — Trajet aller',
+      desc:'Trajet domicile → bureau · cardio modéré', duration:'~30 min',
+      isVelo:true, veloDir:'aller',
+      veloStats:{ km:10, duree:'~30 min', cal:'~220 kcal', difficulte:'Modéré' }
+    },
+    {
+      id:'velo_soir', emoji:'🚴', title:'Vélo — Trajet retour',
+      desc:'Trajet bureau → domicile · cardio fin de journée', duration:'~30 min',
+      isVelo:true, veloDir:'retour',
+      veloStats:{ km:10, duree:'~30 min', cal:'~220 kcal', difficulte:'Modéré' }
+    },
+    {
+      id:'soir_bureau', emoji:'🌙', title:'Soir — Décompression lombaire',
+      desc:'Après le vélo retour · 15–18 min', duration:'15–18 min',
+      exercises:[
+        {id:'b_s1', name:'Étirement psoas (fente basse)', desc:'Genou arrière au sol, avance le bassin. Contre le raccourcissement après vélo + position assise.', reps:'3 × 40 s /côté', sec:240, type:'etirement'},
+        {id:'b_s2', name:'Piriforme figure 4', desc:'Allongé, cheville sur le genou opposé, tire la jambe. Libère hanches et bas du dos.', reps:'2 × 45 s /côté', sec:180, type:'etirement'},
+        {id:'b_s3', name:'Sphinx extension douce', desc:'À plat ventre, avant-bras au sol. Contre les heures en flexion assise.', reps:'3 × 30 s', sec:90, type:'etirement'},
+        {id:'b_s4', name:'Torsion spinale allongée', desc:'Genou plié croisé de l\'autre côté, ouvre les bras en T. Étire toute la chaîne lombaire.', reps:'2 × 45 s /côté', sec:180, type:'etirement'},
+      ]
+    },
+  ],
+  tele: [
+    {
+      id:'matin_tele', emoji:'🌅', title:'Matin — Activation & gainage profond',
+      desc:'Avant le début du travail · 20–22 min', duration:'20–22 min',
+      exercises:[
+        {id:'t_m1', name:'Respiration + activation transverse', desc:'Expire fort, rentre le ventre, tiens 5 s. Active le corset naturel.', reps:'10 souffles', sec:90, type:'gainage'},
+        {id:'t_m2', name:'Dead Bug', desc:'Bras vers plafond, genoux 90°. Descends bras+jambe opposée. Dos plaqué au sol.', reps:'3 × 8 /côté', sec:480, type:'gainage'},
+        {id:'t_m3', name:'Bird Dog', desc:'À 4 pattes, étends bras et jambe opposée. Tiens 3 s. Ne laisse pas le bassin tourner.', reps:'3 × 8 /côté', sec:480, type:'gainage'},
+        {id:'t_m4', name:'Pont fessier + tenu', desc:'Hanches en l\'air, serre fessiers et abdos. Tiens 3 s. Descends lentement.', reps:'3 × 10', sec:180, type:'gainage'},
+        {id:'t_m5', name:'Planche avant', desc:'Avant-bras, corps aligné, ventre rentré. Respire normalement. Tiens sans apnée.', reps:'3 × 20 s', sec:120, type:'gainage'},
+        {id:'t_m6', name:'Rotation lombaire douce', desc:'Genoux croisés de l\'autre côté, allongé. Décompression avant la journée assise.', reps:'2 × 40 s /côté', sec:160, type:'etirement'},
+      ]
+    },
+    {
+      id:'midi_tele', emoji:'☀️', title:'Midi — Circuit abdo + activation cardio',
+      desc:'Pause déjeuner · sans saut, sans impact · 20–23 min', duration:'20–23 min',
+      exercises:[
+        {id:'t_mi1', name:'Step touch dynamique', desc:'Pas latéraux rapides avec bras actifs (ouverture/fermeture en rythme). Cardio sans impact ni saut, silencieux, adapté appartement.', reps:'3 min', sec:180, type:'cardio'},
+        {id:'t_mi2', name:'Crunch bicycle', desc:'Coude vers genou opposé en alternance, lent et contrôlé. Pas de coup de nuque.', reps:'3 × 16 /côté', sec:360, type:'gainage'},
+        {id:'t_mi3', name:'Hollow Body Hold', desc:'Bras au-dessus de la tête, jambes tendues à 30°. Dos plaqué. Contraction intense.', reps:'4 × 15 s', sec:120, type:'gainage'},
+        {id:'t_mi4', name:'Mountain Climbers sol lent', desc:'Position pompe basse, genoux vers poitrine en alternance très lentement (3 s /jambe). Aucun impact, gainage intense + rythme cardiaque modéré.', reps:'3 × 20 s', sec:120, type:'cardio'},
+        {id:'t_mi5', name:'Side Plank', desc:'Avant-bras, corps aligné de côté, hanches levées. Travaille les obliques.', reps:'3 × 20 s /côté', sec:120, type:'gainage'},
+        {id:'t_mi6', name:'Superman allongé', desc:'À plat ventre, lève bras+jambe opposée. Renforce dos extenseur et fessiers.', reps:'3 × 10 (2 s)', sec:120, type:'gainage'},
+        {id:'t_mi7', name:'Étirement hip flexor debout', desc:'En fente, avance le bassin. Contre le raccourcissement par la position assise.', reps:'2 × 30 s /côté', sec:120, type:'etirement'},
+      ]
+    },
+    {
+      id:'soir_tele', emoji:'🌙', title:'Soir — Gainage intense + décompression',
+      desc:'Fin de journée · 22–25 min', duration:'22–25 min',
+      exercises:[
+        {id:'t_s1', name:'Planche dynamique (épaule-épaule)', desc:'En planche, touche l\'épaule opposée en alternance. Anti-rotation des abdos.', reps:'3 × 10 tap', sec:150, type:'gainage'},
+        {id:'t_s2', name:'Crunch jambes tendues', desc:'Jambes à 90°, monte les épaules sans balancer. Contracte fort en haut.', reps:'3 × 12', sec:150, type:'gainage'},
+        {id:'t_s3', name:'Reverse Crunch', desc:'Lève le bassin en ramenant les genoux vers la poitrine. Abdos bas ciblés.', reps:'3 × 12', sec:150, type:'gainage'},
+        {id:'t_s4', name:'Side Plank avec dip', desc:'Descend et remonte la hanche. Obliques + renfort lombaire.', reps:'3 × 12 /côté', sec:240, type:'gainage'},
+        {id:'t_s5', name:'Dead Bug tempo lent', desc:'Même posture mais 5 s descente / 2 s pause / 3 s remontée. Difficulté par le tempo.', reps:'3 × 6 /côté', sec:360, type:'gainage'},
+        {id:'t_s6', name:'Knee-to-chest + torsion spinale', desc:'Genoux poitrine puis torsion lombaire. Décompression complète.', reps:'2 × 40 s /côté', sec:160, type:'etirement'},
+      ]
+    },
+  ],
+  weekend: {
+    sam: [
+      {
+        id:'echauffement_sam', emoji:'🔥', title:'Échauffement général',
+        desc:'Activation articulaire + cardio doux · 10 min', duration:'10 min',
+        exercises:[
+          {id:'s_e1', name:'Marche sur place genoux hauts', desc:'Lève les genoux à hauteur de bassin en alternance, bras actifs. Monte le rythme cardiaque progressivement.', reps:'2 min', sec:120, type:'cardio'},
+          {id:'s_e2', name:'Cercles épaules avant/arrière', desc:'Bras tendus, grands cercles lents. Mobilise l\'articulation gléno-humérale avant l\'effort.', reps:'10 × chaque sens', sec:60, type:'etirement'},
+          {id:'s_e3', name:'Rotations hanches debout', desc:'Mains sur les hanches, grands cercles. Chauffe la ceinture lombaire et les fléchisseurs.', reps:'10 × chaque sens', sec:60, type:'etirement'},
+          {id:'s_e4', name:'Cat-Cow lent', desc:'À 4 pattes, dos rond / dos creusé. Réchauffe toute la colonne avant les charges.', reps:'10 répétitions', sec:90, type:'etirement'},
+          {id:'s_e5', name:'Step touch + bras overhead (V)', desc:'Pas latéraux avec bras qui montent en V au-dessus de la tête. Jambes légèrement écartées. Active tout le haut du corps.', reps:'2 min', sec:120, type:'cardio'},
+        ]
+      },
+      {
+        id:'gainage_pre_sam', emoji:'🧱', title:'Gainage pré-musculation',
+        desc:'Stabilise le dos avant les charges · 15 min', duration:'15 min',
+        exercises:[
+          {id:'s_g1', name:'Dead Bug', desc:'Bras vers plafond, genoux 90°. Descends bras+jambe opposée lentement. Dos plaqué. Active les stabilisateurs profonds avant les haltères.', reps:'3 × 8 /côté', sec:480, type:'gainage'},
+          {id:'s_g2', name:'Bird Dog', desc:'À 4 pattes, bras et jambe opposée tendus 3 s. Prépare le gainage lombaire pour les exercices debout.', reps:'3 × 8 /côté', sec:480, type:'gainage'},
+          {id:'s_g3', name:'Pont fessier tenu', desc:'Hanches en l\'air, serre fessiers + abdos, tiens 3 s. Active les chaînes postérieures avant le rowing et les développés.', reps:'3 × 10', sec:180, type:'gainage'},
+          {id:'s_g4', name:'Planche avant', desc:'Avant-bras, corps aligné, ventre rentré. Prépare la ceinture abdominale à stabiliser sous charge.', reps:'3 × 20 s', sec:120, type:'gainage'},
+        ]
+      },
+      {
+        id:'muscu_sam', emoji:'🏋️', title:'Musculation — Haut du corps',
+        desc:'Banc + haltères · progression douce · 35–50 min', duration:'35–50 min',
+        isMuscu: true,
+        note:'Débutant / reprise : commencer léger (2 kg par haltère). Augmenter les disques uniquement quand les 12 reps sont fluides sur 3 séries. Repos 60–90 s entre séries.',
+        exercises:[
+          {id:'s_mu1', name:'Développé couché à plat (banc)', desc:'Allongé sur le banc à plat, haltères au niveau de la poitrine, coudes à 45°. Pousse vers le haut en expirant. Pectoraux + triceps + épaules avant.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg'},
+          {id:'s_mu2', name:'Développé incliné (banc incliné ~30°)', desc:'Banc incliné, même mouvement. Cible le haut des pectoraux et les deltoïdes antérieurs. Charge identique ou légèrement réduite.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg'},
+          {id:'s_mu3', name:'Rowing un bras (appui sur banc)', desc:'Genou et main sur le banc, dos horizontal. Tire l\'haltère vers la hanche, coude rasant. Grand dorsal + rhomboïdes + biceps.', reps:'3 × 12 /côté', sec:480, type:'muscu', charge:'1×2 kg'},
+          {id:'s_mu4', name:'Élévations latérales debout', desc:'Debout, légèrement penché en avant, jambes écartées. Lève les bras en T jusqu\'à hauteur d\'épaules, descends lentement. Deltoïdes médians.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg'},
+          {id:'s_mu5', name:'Curl biceps debout', desc:'Debout, jambes écartées, haltères en supination. Fléchis les coudes sans bouger les épaules. Descends lentement (2 s). Biceps.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg'},
+          {id:'s_mu6', name:'Extension triceps couché (banc plat)', desc:'Allongé, haltères tendus vers le plafond. Fléchis uniquement les coudes pour descendre les haltères de chaque côté de la tête. Triceps longs.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg'},
+          {id:'s_mu7', name:'Oiseau incliné / Reverse fly (banc décliné léger)', desc:'Allongé face vers le bas sur banc légèrement décliné, bras pendants. Lève les bras en T. Trapèzes moyens + deltoïdes postérieurs. Clé pour la posture.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg'},
+          {id:'s_mu8', name:'Shrugs (haussements d\'épaules)', desc:'Debout jambes écartées, haltères le long du corps. Monte les épaules vers les oreilles, tiens 1 s, descends lentement. Trapèzes supérieurs.', reps:'3 × 12', sec:180, type:'muscu', charge:'2×2 kg'},
+        ]
+      },
+      {
+        id:'gainage_post_sam', emoji:'🧘', title:'Gainage post-effort + étirements',
+        desc:'Retour au calme · récupération active · 15–20 min', duration:'15–20 min',
+        exercises:[
+          {id:'s_p1', name:'Side Plank statique', desc:'Après l\'effort, le gainage latéral consolide ce que la musculation a travaillé. Corps aligné, hanches levées.', reps:'2 × 20 s /côté', sec:80, type:'gainage'},
+          {id:'s_p2', name:'Étirement pectoraux (angle mur)', desc:'Avant-bras contre un encadrement de porte, penche doucement le thorax vers l\'avant. Ouverture pectorale post-développé.', reps:'2 × 40 s /côté', sec:160, type:'etirement'},
+          {id:'s_p3', name:'Étirement grand dorsal (bras overhead)', desc:'Debout, jambes écartées, agrippe un encadrement ou un mur en hauteur, laisse le poids du corps étirer le côté. Post-rowing.', reps:'2 × 40 s /côté', sec:160, type:'etirement'},
+          {id:'s_p4', name:'Étirement trapèzes (inclinaison latérale tête)', desc:'Assis, penche la tête vers l\'épaule, aide doucement avec la main. Relâche les trapèzes chargés pendant les shrugs.', reps:'2 × 30 s /côté', sec:120, type:'etirement'},
+          {id:'s_p5', name:'Sphinx + enfant (Child\'s pose)', desc:'Sphinx 30 s pour ouvrir les lombaires, puis position de l\'enfant 40 s. Décompression complète de la colonne post-effort.', reps:'2 × 70 s', sec:280, type:'etirement'},
+          {id:'s_p6', name:'Torsion spinale allongée', desc:'Allongé, genou croisé de l\'autre côté, bras en T. Relâchement final des lombaires et de la chaîne latérale.', reps:'2 × 45 s /côté', sec:180, type:'etirement'},
+        ]
+      },
+    ],
+    dim: [
+      {
+        id:'yoga_dim', emoji:'🧘', title:'Yoga doux — Récupération active',
+        desc:'Adapté dos raide + ventre proéminent · sans flexions profondes · 45–60 min', duration:'45–60 min',
+        isYoga: true,
+        note:'Toutes les postures ont une alternative plus accessible. Ne force jamais dans la douleur — l\'inconfort doux est normal, la douleur ne l\'est pas. Respire profondément sur chaque posture.',
+        exercises:[
+          {id:'d_y1', name:'Respiration ujjayi allongé', desc:'Allongé, genoux fléchis. Inspire 4 s par le nez, expire 6 s lentement. Calme le système nerveux, prépare le corps.', reps:'2 min', sec:120, type:'yoga'},
+          {id:'d_y2', name:'Pawanmuktasana (libération des vents)', desc:'Allongé, ramène un genou vers la poitrine, tiens. Alternative au toucher orteils. Décompresse le bas du dos en douceur.', reps:'3 × 30 s /côté', sec:180, type:'yoga'},
+          {id:'d_y3', name:'Apanasana (deux genoux poitrine)', desc:'Les deux genoux ensemble vers la poitrine, bercement doux gauche-droite. Massage lombaire, accessible quelque soit la souplesse.', reps:'1 min', sec:60, type:'yoga'},
+          {id:'d_y4', name:'Marjariasana / Bitilasana (Cat-Cow yoga)', desc:'À 4 pattes, synchronise le mouvement avec la respiration. Plus lent que la version fitness. Mobilise toute la colonne vertébrale.', reps:'10 cycles lents', sec:120, type:'yoga'},
+          {id:'d_y5', name:'Balasana (posture de l\'enfant)', desc:'Genoux écartés à la largeur du tapis, orteils joints, assis sur les talons, bras tendus devant. Écarter les genoux évite la compression abdominale.', reps:'2 × 45 s', sec:90, type:'yoga'},
+          {id:'d_y6', name:'Bhujangasana (cobra bas)', desc:'À plat ventre, mains sous les épaules, lève uniquement le haut du buste avec les muscles du dos (pas les bras). Ouvre les pectoraux et les lombaires.', reps:'3 × 30 s', sec:180, type:'yoga'},
+          {id:'d_y7', name:'Setu Bandha (pont yoga)', desc:'Allongé, pieds à plat, monte les hanches en expirant. Plus long et plus conscient que le pont fitness. Ouvre la poitrine, renforce la chaîne postérieure.', reps:'3 × 40 s', sec:240, type:'yoga'},
+          {id:'d_y8', name:'Supta Matsyendrasana (torsion allongée)', desc:'Allongé, genou fléchi croisé de l\'autre côté, bras en T, regarde à l\'opposé. Torsion douce de toute la colonne. Alternative à la torsion assise qui comprime le ventre.', reps:'2 × 60 s /côté', sec:240, type:'yoga'},
+          {id:'d_y9', name:'Virabhadrasana I modifié (guerrier I)', desc:'Fente avant, pied arrière à 45°, bras levés en V (jambes légèrement écartées). Ouvre hanches + psoas + épaules simultanément.', reps:'2 × 40 s /côté', sec:160, type:'yoga'},
+          {id:'d_y10', name:'Trikonasana (triangle) version mur', desc:'Debout, pieds écartés, main sur la cuisse ou le tibia (pas le sol), autre bras vers le plafond. La main sur la jambe évite la flexion profonde et la compression abdominale.', reps:'2 × 40 s /côté', sec:160, type:'yoga'},
+          {id:'d_y11', name:'Vrksasana (arbre) bras en V', desc:'Debout, pied en appui sur le mollet ou la cuisse intérieure. Bras levés en V, jambes légèrement écartées. Équilibre + concentration + ouverture des hanches.', reps:'2 × 30 s /côté', sec:120, type:'yoga'},
+          {id:'d_y12', name:'Viparita Karani (jambes au mur)', desc:'Allongé, fesses proches du mur, jambes tendues vers le haut. Drainage veineux post-semaine de vélo. Relâchement lombaire passif.', reps:'3 min', sec:180, type:'yoga'},
+          {id:'d_y13', name:'Savasana (relaxation finale)', desc:'Allongé, bras légèrement écartés du corps, yeux fermés. Scan corporel de la tête aux pieds. Intègre les bénéfices de la séance.', reps:'5 min', sec:300, type:'yoga'},
+        ]
+      },
+    ],
+  },
+};
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+let currentWeekOffset = 0;
+let activeDay = 'lun';
+const timers = {};
+
+function getWeekKey(offset=currentWeekOffset) {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day===0?-6:1);
+  const mon = new Date(d.setDate(diff));
+  mon.setDate(mon.getDate() + offset*7);
+  return `w${mon.getFullYear()}${String(mon.getMonth()+1).padStart(2,'0')}${String(mon.getDate()).padStart(2,'0')}`;
+}
+
+function getWeekDates(offset=currentWeekOffset) {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day===0?-6:1);
+  const mon = new Date(new Date().setDate(diff));
+  mon.setDate(mon.getDate() + offset*7);
+  const sun = new Date(mon); sun.setDate(sun.getDate()+6);
+  const fmt = d => d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
+  return { label: fmt(mon)+' – '+fmt(sun), weekNum: getWeekNumber(mon), year: mon.getFullYear() };
+}
+
+function getWeekNumber(d) {
+  const onejan = new Date(d.getFullYear(),0,1);
+  return Math.ceil((((d-onejan)/86400000)+onejan.getDay()+1)/7);
+}
+
+// ═══════════════════════════════════════════════
+//  GOOGLE DRIVE SYNC
+// ═══════════════════════════════════════════════
+
+// ⚙️ REMPLACE PAR TON CLIENT ID GOOGLE CLOUD
+const GOOGLE_CLIENT_ID = '32795966086-3kt7ddob947h1bsahsmfom1qlmtkucea.apps.googleusercontent.com';
+const DRIVE_FILENAME = 'fitness_programme_semaine.json';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+
+let driveState = {
+  connected: false, accessToken: null, fileId: null,
+  syncing: false, data: {}, saveTimer: null
+};
+
+function setSyncUI(state, label) {
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-label');
+  const btn = document.getElementById('sync-btn');
+  dot.className = 'sync-dot' + (state ? ' '+state : '');
+  if (lbl) lbl.textContent = label;
+  if (state === 'connected') { btn.textContent = 'Synchronisé ✓'; btn.className = 'sync-btn'; }
+  else if (state === 'syncing') { btn.textContent = '⟳ Sync…'; btn.className = 'sync-btn'; }
+  else if (state === 'error') { btn.textContent = 'Réessayer'; btn.className = 'sync-btn primary'; }
+  else { btn.textContent = 'Connecter Drive'; btn.className = 'sync-btn primary'; }
+}
+
+function handleSyncBtn() {
+  if (driveState.connected) forceSyncToDrive();
+  else initGoogleAuth();
+}
+
+function initGoogleAuth() {
+  if (!window.google || !GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith('VOTRE')) {
+    alert('⚙️ Configure ton Client ID Google dans le fichier HTML.\nConsulte le guide de configuration fourni.');
+    return;
+  }
+  setSyncUI('syncing', 'Connexion à Google…');
+  google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID, scope: DRIVE_SCOPE,
+    callback: async (resp) => {
+      if (resp.error) { setSyncUI('error', 'Erreur de connexion Google'); return; }
+      driveState.accessToken = resp.access_token;
+      driveState.connected = true;
+      localStorage.setItem('fitness_drive_token', resp.access_token);
+      setSyncUI('syncing', 'Chargement des données Drive…');
+      await loadFromDrive();
+    }
+  }).requestAccessToken();
+}
+
+function tryRestoreToken() {
+  const saved = localStorage.getItem('fitness_drive_token');
+  if (!saved || !window.google || !GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith('VOTRE')) return;
+  try {
+    google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID, scope: DRIVE_SCOPE, prompt: 'none',
+      callback: async (resp) => {
+        if (resp.error || !resp.access_token) return;
+        driveState.accessToken = resp.access_token;
+        driveState.connected = true;
+        localStorage.setItem('fitness_drive_token', resp.access_token);
+        setSyncUI('syncing', 'Restauration session Drive…');
+        await loadFromDrive();
+      }
+    }).requestAccessToken();
+  } catch(e) {}
+}
+
+async function driveReq(method, url, bodyObj) {
+  const headers = { Authorization: 'Bearer ' + driveState.accessToken };
+  if (bodyObj) headers['Content-Type'] = 'application/json';
+  const res = await fetch(url, { method, headers, body: bodyObj ? JSON.stringify(bodyObj) : undefined });
+  if (res.status === 401) { driveState.connected = false; setSyncUI('error','Session expirée — reconnecte-toi'); return null; }
+  return res;
+}
+
+async function findDriveFile() {
+  const res = await driveReq('GET',
+    `https://www.googleapis.com/drive/v3/files?q=name='${DRIVE_FILENAME}'+and+trashed=false&fields=files(id)`
+  );
+  if (!res) return null;
+  const d = await res.json();
+  return d.files && d.files.length > 0 ? d.files[0].id : null;
+}
+
+async function loadFromDrive() {
+  try {
+    const fileId = await findDriveFile();
+    if (fileId) {
+      driveState.fileId = fileId;
+      const res = await driveReq('GET', `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+      if (!res) return;
+      const remote = await res.json();
+      driveState.data = Object.assign({}, getAllLocalData(), remote);
+      setSyncUI('connected', 'Drive connecté · ' + DRIVE_FILENAME);
+    } else {
+      driveState.data = getAllLocalData();
+      await saveToDrive();
+      setSyncUI('connected', 'Drive connecté · fichier créé');
+    }
+    renderAllPanels(); renderTabs(); renderOverview();
+  } catch(e) { setSyncUI('error', 'Erreur chargement Drive'); console.error(e); }
+}
+
+async function saveToDrive() {
+  if (!driveState.connected || !driveState.accessToken) return;
+  setSyncUI('syncing', 'Sauvegarde en cours…');
+  try {
+    const blob = new Blob([JSON.stringify(driveState.data)], {type:'application/json'});
+    const form = new FormData();
+    const meta = {name: DRIVE_FILENAME, mimeType: 'application/json'};
+    form.append('metadata', new Blob([JSON.stringify(meta)], {type:'application/json'}));
+    form.append('file', blob);
+    let res;
+    if (driveState.fileId) {
+      res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveState.fileId}?uploadType=multipart`, {
+        method: 'PATCH', headers: {Authorization:'Bearer '+driveState.accessToken}, body: form
+      });
+    } else {
+      res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST', headers: {Authorization:'Bearer '+driveState.accessToken}, body: form
+      });
+      const created = await res.json();
+      driveState.fileId = created.id;
+    }
+    const t = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    setSyncUI('connected', `Drive · sync ${t}`);
+  } catch(e) { setSyncUI('error', 'Erreur sauvegarde Drive'); console.error(e); }
+}
+
+function scheduleSave() {
+  if (driveState.saveTimer) clearTimeout(driveState.saveTimer);
+  driveState.saveTimer = setTimeout(() => { if (driveState.connected) saveToDrive(); }, 2000);
+}
+
+function getAllLocalData() {
+  const all = {};
+  for (let i=0; i<localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('fitness_w')) {
+      try { all[k] = JSON.parse(localStorage.getItem(k)); } catch(e) {}
+    }
+  }
+  return all;
+}
+
+async function forceSyncToDrive() {
+  driveState.data = getAllLocalData();
+  await saveToDrive();
+}
+
+// ── STORAGE API ──
+function storageKey(dayId, sub) {
+  return `fitness_${getWeekKey()}_${dayId}_${sub}`;
+}
+
+function loadData(dayId) {
+  try {
+    const ck = storageKey(dayId,'checks');
+    const jk = storageKey(dayId,'journal');
+    const src = driveState.connected ? driveState.data : {};
+    const checks = src[ck] || JSON.parse(localStorage.getItem(ck)||'{}');
+    const journal = src[jk] || JSON.parse(localStorage.getItem(jk)||'{}');
+    return { checks, journal };
+  } catch(e) { return { checks:{}, journal:{} }; }
+}
+
+function saveChecks(dayId, checks) {
+  const k = storageKey(dayId,'checks');
+  localStorage.setItem(k, JSON.stringify(checks));
+  if (driveState.connected) { driveState.data[k] = checks; scheduleSave(); }
+}
+
+function saveJournal(dayId, journal) {
+  const k = storageKey(dayId,'journal');
+  localStorage.setItem(k, JSON.stringify(journal));
+  if (driveState.connected) { driveState.data[k] = journal; scheduleSave(); }
+}
+
+// ═══════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════
+
+function getSessionsForDay(dayId) {
+  const day = DAYS.find(d=>d.id===dayId);
+  if (day.type === 'weekend') {
+    const w = SESSIONS.weekend;
+    if (!w) return null;
+    return w[dayId] || null;
+  }
+  return SESSIONS[day.type];
+}
+
+function countExercises(dayId) {
+  const sessions = getSessionsForDay(dayId);
+  if (!sessions) return { total:0, done:0 };
+  let total=0, done=0;
+  const { checks } = loadData(dayId);
+  sessions.forEach(s => {
+    if (s.isVelo) {
+      total++;
+      if (checks['velo_'+s.veloDir]) done++;
+    } else if (s.exercises) {
+      s.exercises.forEach(ex => {
+        total++;
+        if (checks[ex.id]) done++;
+      });
+    }
+  });
+  return { total, done };
+}
+
+function renderOverview() {
+  const bar = document.getElementById('overview-bar');
+  bar.innerHTML = '';
+  DAYS.forEach(d => {
+    const { total, done } = countExercises(d.id);
+    const pct = total ? Math.round(done/total*100) : 0;
+    const cls = pct===100 ? 'full' : pct>0 ? 'partial' : '';
+    const isActive = d.id === activeDay ? 'active-day' : '';
+    const div = document.createElement('div');
+    div.className = 'ov-day';
+    div.innerHTML = `<div class="ov-ring ${cls} ${isActive}">${pct}%</div><div class="ov-label">${d.label}</div>`;
+    div.onclick = () => switchDay(d.id);
+    bar.appendChild(div);
+  });
+}
+
+function renderTabs() {
+  const tabs = document.getElementById('day-tabs');
+  tabs.innerHTML = '';
+  DAYS.forEach(d => {
+    const { total, done } = countExercises(d.id);
+    const tab = document.createElement('div');
+    tab.className = 'day-tab' + (d.id===activeDay?' active':'');
+    tab.id = 'tab_'+d.id;
+    const dotColor = d.type==='bureau'?'#C05A20':d.type==='tele'?'#2E6E4E':'#4A4FA8';
+    tab.innerHTML = `${d.fullName}<span class="done-count">${done}/${total}</span><span class="day-dot" style="background:${dotColor}"></span>`;
+    tab.onclick = () => switchDay(d.id);
+    tabs.appendChild(tab);
+  });
+}
+
+function switchDay(dayId) {
+  activeDay = dayId;
+  renderTabs();
+  renderOverview();
+  document.querySelectorAll('.day-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('panel_'+dayId);
+  if (panel) panel.classList.add('active');
+  // Scroll tab into view
+  const tab = document.getElementById('tab_'+dayId);
+  if (tab) tab.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+}
+
+function renderAllPanels() {
+  const container = document.getElementById('day-panels');
+  container.innerHTML = '';
+  DAYS.forEach(d => {
+    const panel = document.createElement('div');
+    panel.className = 'day-panel' + (d.id===activeDay?' active':'');
+    panel.id = 'panel_'+d.id;
+    panel.innerHTML = renderDayPanel(d);
+    container.appendChild(panel);
+    // Bind events after DOM insert
+    bindDayEvents(d.id, panel);
+  });
+}
+
+function renderDayPanel(day) {
+  const sessions = getSessionsForDay(day.id);
+  const { checks, journal } = loadData(day.id);
+
+  // Day header stats
+  let totalMin = 0, totalKm = 0, totalKcal = 0;
+  if (sessions) {
+    sessions.forEach(s => {
+      if (s.isVelo) { totalKm += 10; totalKcal += 220; totalMin += 30; }
+      else if (s.exercises) {
+        const mins = parseInt(s.duration)||0;
+        totalMin += (parseInt(s.duration)||20);
+        totalKcal += Math.round((parseInt(s.duration)||20) * 2.5);
+      }
+    });
+  }
+
+  let html = `
+    <div class="day-header">
+      <div class="day-title-block">
+        <div class="day-name">${day.fullName}</div>
+        <span class="day-type-badge badge-${TYPE_COLORS[day.type]}">${TYPE_LABELS[day.type]}</span>
+      </div>
+      <div class="day-stats">
+        <div class="stat-pill"><div class="stat-val">${totalMin}</div><div class="stat-lbl">min</div></div>
+        ${totalKm ? `<div class="stat-pill"><div class="stat-val">${totalKm}</div><div class="stat-lbl">km vélo</div></div>` : ''}
+        <div class="stat-pill"><div class="stat-val">~${totalKcal}</div><div class="stat-lbl">kcal</div></div>
+      </div>
+    </div>`;
+
+  if (!sessions) {
+    html += `<div class="soon-card"><div class="soon-icon">🗓️</div><div class="soon-title">Aucune séance prévue</div></div>`;
+  } else {
+    sessions.forEach(s => {
+      if (s.isVelo) {
+        const isChecked = checks['velo_'+s.veloDir] ? 'checked' : '';
+        html += `<div class="velo-card">
+          <div class="velo-icon">🚴</div>
+          <div class="velo-info">
+            <div class="velo-title">${s.title}</div>
+            <div class="velo-sub">${s.desc}</div>
+            <div class="velo-stats">
+              <div class="velo-stat"><strong>${s.veloStats.km} km</strong>distance</div>
+              <div class="velo-stat"><strong>${s.veloStats.duree}</strong>durée</div>
+              <div class="velo-stat"><strong>${s.veloStats.cal}</strong>calories</div>
+              <div class="velo-stat"><strong>${s.veloStats.difficulte}</strong>intensité</div>
+            </div>
+            <div class="velo-check-row">
+              <div class="velo-checkbox ${isChecked}" id="vcheck_${day.id}_${s.veloDir}" onclick="toggleVelo('${day.id}','${s.veloDir}',this)">${isChecked?'✓':''}</div>
+              <span class="velo-check-label">Trajet effectué</span>
+            </div>
+          </div>
+        </div>`;
+      } else if (s.exercises) {
+        const allDone = s.exercises.every(ex => checks[ex.id]);
+        html += `<div class="session-card">
+          <div class="session-head">
+            <div class="session-emoji">${s.emoji}</div>
+            <div class="session-info">
+              <div class="session-title">${s.title}</div>
+              <div class="session-meta">${s.desc}</div>
+            </div>
+            <div>
+              <div class="session-duration">${s.duration}</div>
+              <span class="session-done-badge ${allDone?'visible':''}">✓ Terminé</span>
+            </div>
+          </div>
+          ${s.note ? `<div class="note-banner">💡 ${s.note}</div>` : ''}
+          <div class="ex-list">
+            ${s.exercises.map((ex,i) => {
+              const checked = checks[ex.id] ? 'checked' : '';
+              return `<div class="ex-row ${checked}" id="exrow_${day.id}_${ex.id}" onclick="toggleEx('${day.id}','${ex.id}','${s.id}',this)">
+                <div class="ex-check">${checked?'✓':''}</div>
+                <div class="ex-body">
+                  <div class="ex-name">${i+1}. ${ex.name}</div>
+                  <div class="ex-desc">${ex.desc}</div>
+                </div>
+                <div class="ex-right">
+                  <span class="ex-reps">${ex.reps}</span>
+                  ${ex.charge ? `<span class="charge-tag">${ex.charge}</span>` : ''}
+                  <div class="type-dot dot-${ex.type}"></div>
+                  <button class="timer-btn" id="tbtn_${day.id}_${ex.id}" onclick="event.stopPropagation();toggleTimer('${day.id}_${ex.id}',${ex.sec})"
+                    >▶ <span id="tdisp_${day.id}_${ex.id}">${fmtTime(ex.sec)}</span></button>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }
+    });
+  }
+
+  // Journal
+  const jData = journal || {};
+  const stars = jData.rating || 0;
+  const feeling = jData.feeling || '';
+  const note = jData.note || '';
+
+  html += `<div class="journal-section">
+    <div class="journal-title">📔 Journal du jour</div>
+    <div class="rating-row">
+      <span class="rating-lbl">Séance</span>
+      ${[1,2,3,4,5].map(n=>`<button class="star-btn ${stars>=n?'active':''}" id="star_${day.id}_${n}" onclick="setStar('${day.id}',${n})">★</button>`).join('')}
+    </div>
+    <div class="rating-row">
+      <span class="rating-lbl">Ressenti</span>
+      <div class="feeling-btns">
+        ${['😴 Fatigué','💪 En forme','😅 Difficile','✅ Parfait','🤕 Douleur'].map(f=>`<button class="feel-btn ${feeling===f?'selected':''}" onclick="setFeeling('${day.id}','${f}',this)">${f}</button>`).join('')}
+      </div>
+    </div>
+    <textarea class="journal-textarea" id="journal_${day.id}" placeholder="Notes, observations, douleurs éventuelles...">${note}</textarea>
+    <button class="save-btn" onclick="saveJournalEntry('${day.id}')">Enregistrer les notes</button>
+    <div class="save-confirm" id="saveconfirm_${day.id}">✓ Enregistré</div>
+  </div>`;
+
+  return html;
+}
+
+// ═══════════════════════════════════════════════
+//  INTERACTIONS
+// ═══════════════════════════════════════════════
+
+function bindDayEvents(dayId, panel) { /* events are inline for simplicity */ }
+
+function toggleEx(dayId, exId, sessionId, row) {
+  const { checks } = loadData(dayId);
+  checks[exId] = !checks[exId];
+  saveChecks(dayId, checks);
+  row.classList.toggle('checked', checks[exId]);
+  row.querySelector('.ex-check').textContent = checks[exId]?'✓':'';
+  // Update session done badge
+  updateSessionBadge(dayId, sessionId, checks);
+  updateTabCount(dayId);
+  renderOverview();
+}
+
+function updateSessionBadge(dayId, sessionId, checks) {
+  const sessions = getSessionsForDay(dayId);
+  if (!sessions) return;
+  const s = sessions.find(s=>s.id===sessionId);
+  if (!s || !s.exercises) return;
+  const allDone = s.exercises.every(ex=>checks[ex.id]);
+  const badges = document.querySelectorAll(`#panel_${dayId} .session-done-badge`);
+  // Find the badge in the right card - simplified: re-check all
+  const panel = document.getElementById('panel_'+dayId);
+  if (!panel) return;
+  const cards = panel.querySelectorAll('.session-card');
+  cards.forEach(card => {
+    const firstEx = card.querySelector('.ex-row');
+    if (!firstEx) return;
+    const exInSession = s.exercises.some(ex => firstEx.id.includes(ex.id));
+    if (exInSession) {
+      const badge = card.querySelector('.session-done-badge');
+      if (badge) badge.classList.toggle('visible', allDone);
+    }
+  });
+}
+
+function toggleVelo(dayId, dir, el) {
+  const { checks } = loadData(dayId);
+  checks['velo_'+dir] = !checks['velo_'+dir];
+  saveChecks(dayId, checks);
+  el.classList.toggle('checked', checks['velo_'+dir]);
+  el.textContent = checks['velo_'+dir]?'✓':'';
+  updateTabCount(dayId);
+  renderOverview();
+}
+
+function updateTabCount(dayId) {
+  const { total, done } = countExercises(dayId);
+  const tab = document.getElementById('tab_'+dayId);
+  if (tab) {
+    const span = tab.querySelector('.done-count');
+    if (span) span.textContent = done+'/'+total;
+  }
+}
+
+function setStar(dayId, n) {
+  const { checks, journal } = loadData(dayId);
+  journal.rating = n;
+  saveJournal(dayId, journal);
+  for (let i=1;i<=5;i++) {
+    const btn = document.getElementById(`star_${dayId}_${i}`);
+    if (btn) btn.classList.toggle('active', i<=n);
+  }
+}
+
+function setFeeling(dayId, feeling, el) {
+  const { checks, journal } = loadData(dayId);
+  journal.feeling = feeling;
+  saveJournal(dayId, journal);
+  const panel = document.getElementById('panel_'+dayId);
+  if (panel) panel.querySelectorAll('.feel-btn').forEach(b=>b.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function saveJournalEntry(dayId) {
+  const { journal } = loadData(dayId);
+  const ta = document.getElementById('journal_'+dayId);
+  if (ta) journal.note = ta.value;
+  saveJournal(dayId, journal);
+  const conf = document.getElementById('saveconfirm_'+dayId);
+  if (conf) { conf.classList.add('show'); setTimeout(()=>conf.classList.remove('show'),2000); }
+}
+
+// ═══════════════════════════════════════════════
+//  TIMERS
+// ═══════════════════════════════════════════════
+
+function fmtTime(s) {
+  return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+}
+
+function toggleTimer(id, total) {
+  const btn = document.getElementById('tbtn_'+id);
+  const disp = document.getElementById('tdisp_'+id);
+  if (!btn) return;
+  if (timers[id] && timers[id].running) {
+    clearInterval(timers[id].interval);
+    timers[id].running = false;
+    btn.classList.remove('running');
+    btn.innerHTML = `▶ <span id="tdisp_${id}">${fmtTime(timers[id].remaining)}</span>`;
+  } else {
+    if (!timers[id]) timers[id] = { remaining: total };
+    timers[id].running = true;
+    btn.classList.add('running');
+    btn.innerHTML = `■ <span id="tdisp_${id}">${fmtTime(timers[id].remaining)}</span>`;
+    timers[id].interval = setInterval(() => {
+      timers[id].remaining--;
+      const d = document.getElementById('tdisp_'+id);
+      if (d) d.textContent = fmtTime(Math.max(0, timers[id].remaining));
+      if (timers[id].remaining <= 0) {
+        clearInterval(timers[id].interval);
+        timers[id].running = false;
+        timers[id].remaining = total;
+        const b = document.getElementById('tbtn_'+id);
+        if (b) { b.classList.remove('running'); b.innerHTML = `▶ <span id="tdisp_${id}">${fmtTime(total)}</span>`; }
+      }
+    }, 1000);
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  WEEK NAV
+// ═══════════════════════════════════════════════
+
+function changeWeek(delta) {
+  currentWeekOffset += delta;
+  updateWeekDisplay();
+  renderAllPanels();
+  renderTabs();
+  renderOverview();
+}
+
+function updateWeekDisplay() {
+  const { label, weekNum, year } = getWeekDates();
+  const isCurrentWeek = currentWeekOffset === 0;
+  document.getElementById('week-display').textContent = `Semaine ${weekNum} ${year}${isCurrentWeek?' · Cette semaine':''}`;
+  document.getElementById('week-range-label').textContent = label;
+}
+
+// ═══════════════════════════════════════════════
+//  INIT — auto-select today
+// ═══════════════════════════════════════════════
+
+(function init() {
+  const jsDay = new Date().getDay(); // 0=dim, 1=lun...
+  const dayMap = [6,0,1,2,3,4,5]; // JS day → index in DAYS
+  activeDay = DAYS[dayMap[jsDay] ?? 0].id;
+  updateWeekDisplay();
+  renderAllPanels();
+  renderTabs();
+  renderOverview();
+  setTimeout(tryRestoreToken, 800);
+})();
+</script>
+</body>
+</html>
