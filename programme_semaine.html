@@ -191,7 +191,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .serie-phase{font-size:10px;color:var(--muted);font-style:italic;flex:1;text-align:right}
 .serie-phase.active-phase{color:var(--tele)}
 
-.serie-info{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);background:var(--surface2);border-radius:5px;padding:3px 8px;white-space:normal;line-height:1.5;width:100%;margin-top:2px}
+.serie-info{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);background:var(--surface2);border-radius:6px;padding:5px 10px;white-space:normal;line-height:1.5;display:block;margin-bottom:.4rem}
 /* Scrollbar */
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
@@ -949,32 +949,56 @@ function isDurationEx(ex) {
   return /\d+\s*s/.test(ex.reps) || /\d+\s*min/.test(ex.reps);
 }
 
-// ── Parse reps string → { sets, secPerSet, restSec } ──
+// ── Parse reps string → { sets, secPerSet, restSec, lateral } ──
 function parseReps(reps, totalSec) {
-  // Patterns: "3 × 30 s /côté", "2 × 45 s", "4 × 15 s", "3 min", "2 min", "1 min", "5 min"
-  // For /côté: totalSec already accounts for both sides
+  const lateral = /\/côté/.test(reps);
   const setMatch = reps.match(/^(\d+)\s*[×x]/);
   const sets = setMatch ? parseInt(setMatch[1]) : 1;
-  const secPerSet = sets > 0 ? Math.round(totalSec / sets) : totalSec;
-  const restSec = secPerSet >= 40 ? 20 : 15; // shorter rest for short holds
-  return { sets, secPerSet, restSec };
+  // If lateral: totalSec covers ALL sets × 2 sides, so sec per side per set = totalSec / (sets*2)
+  const secPerSide = lateral
+    ? Math.round(totalSec / (sets * 2))
+    : Math.round(totalSec / sets);
+  const restSec = secPerSide >= 40 ? 20 : 15;
+  return { sets, secPerSide, restSec, lateral };
 }
 
 // ── Render series tracker HTML ──
 function renderSeriesTracker(dayId, ex) {
-  const { sets, secPerSet, restSec } = parseReps(ex.reps, ex.sec);
+  const { sets, secPerSide, restSec, lateral } = parseReps(ex.reps, ex.sec);
   let html = `<div class="series-tracker" id="st_${dayId}_${ex.id}">`;
-  for (let i = 0; i < sets; i++) {
-    const sid = `${dayId}_${ex.id}_s${i}`;
-    html += `<div class="series-row" id="srow_${sid}">
-      <div class="serie-check" id="schk_${sid}" onclick="toggleSerieCheck('${sid}')"></div>
-      <span class="serie-label">Série ${i+1}/${sets}</span>
-      <button class="serie-timer-btn" id="stbtn_${sid}" onclick="startSerieTimer('${sid}',${secPerSet},${restSec},${i},${sets})">
-        ▶ <span id="stdisp_${sid}">${fmtTime(secPerSet)}</span>
-      </button>
-      <span class="serie-phase" id="sphase_${sid}"></span>
-    </div>`;
+
+  if (lateral) {
+    // 6 rows (for 3 sets): Gauche 1/3, Droite 1/3, Gauche 2/3 ...
+    const sides = ['G', 'D'];
+    const sideLabels = ['Gauche', 'Droite'];
+    for (let i = 0; i < sets; i++) {
+      for (let s = 0; s < 2; s++) {
+        const sid = `${dayId}_${ex.id}_s${i}_${sides[s]}`;
+        const isLastRow = (i === sets-1 && s === 1);
+        html += `<div class="series-row" id="srow_${sid}">
+          <div class="serie-check" id="schk_${sid}" onclick="toggleSerieCheck('${sid}')"></div>
+          <span class="serie-label">${sideLabels[s]} ${i+1}/${sets}</span>
+          <button class="serie-timer-btn" id="stbtn_${sid}" onclick="startSerieTimer('${sid}',${secPerSide},${restSec},${i*2+s},${sets*2})">
+            ▶ <span id="stdisp_${sid}">${fmtTime(secPerSide)}</span>
+          </button>
+          <span class="serie-phase" id="sphase_${sid}"></span>
+        </div>`;
+      }
+    }
+  } else {
+    for (let i = 0; i < sets; i++) {
+      const sid = `${dayId}_${ex.id}_s${i}`;
+      html += `<div class="series-row" id="srow_${sid}">
+        <div class="serie-check" id="schk_${sid}" onclick="toggleSerieCheck('${sid}')"></div>
+        <span class="serie-label">Série ${i+1}/${sets}</span>
+        <button class="serie-timer-btn" id="stbtn_${sid}" onclick="startSerieTimer('${sid}',${secPerSide},${restSec},${i},${sets})">
+          ▶ <span id="stdisp_${sid}">${fmtTime(secPerSide)}</span>
+        </button>
+        <span class="serie-phase" id="sphase_${sid}"></span>
+      </div>`;
+    }
   }
+
   html += `</div>`;
   return html;
 }
@@ -990,20 +1014,40 @@ function parseRepSets(reps) {
 
 function renderRepTracker(dayId, ex) {
   const sets = parseRepSets(ex.reps);
+  const lateral = /\/côté/.test(ex.reps);
   const restSec = 60;
   const info = ex.serieInfo || '';
   let html = `<div class="series-tracker" id="st_${dayId}_${ex.id}">`;
-  for (let i = 0; i < sets; i++) {
-    const sid = `${dayId}_${ex.id}_s${i}`;
-    const isLast = i === sets - 1;
-    html += `<div class="series-row" id="srow_${sid}">
-      <div class="serie-check" id="schk_${sid}" onclick="repSerieCheck('${sid}',${restSec},${isLast})"></div>
-      <span class="serie-label">Série ${i+1}/${sets}</span>
-      <span class="serie-phase" id="sphase_${sid}"></span>
-      <span id="stdisp_${sid}" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);flex-shrink:0;display:none"></span>
-      ${info ? `<span class="serie-info">${info}</span>` : ''}
-    </div>`;
+  if (info) html += `<span class="serie-info">${info}</span>`;
+
+  if (lateral) {
+    const sides = ['G', 'D'];
+    const sideLabels = ['Gauche', 'Droite'];
+    for (let i = 0; i < sets; i++) {
+      for (let s = 0; s < 2; s++) {
+        const sid = `${dayId}_${ex.id}_s${i}_${sides[s]}`;
+        const isLast = (i === sets-1 && s === 1);
+        html += `<div class="series-row" id="srow_${sid}">
+          <div class="serie-check" id="schk_${sid}" onclick="repSerieCheck('${sid}',${restSec},${isLast})"></div>
+          <span class="serie-label">${sideLabels[s]} ${i+1}/${sets}</span>
+          <span class="serie-phase" id="sphase_${sid}"></span>
+          <span id="stdisp_${sid}" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);flex-shrink:0;display:none"></span>
+        </div>`;
+      }
+    }
+  } else {
+    for (let i = 0; i < sets; i++) {
+      const sid = `${dayId}_${ex.id}_s${i}`;
+      const isLast = i === sets - 1;
+      html += `<div class="series-row" id="srow_${sid}">
+        <div class="serie-check" id="schk_${sid}" onclick="repSerieCheck('${sid}',${restSec},${isLast})"></div>
+        <span class="serie-label">Série ${i+1}/${sets}</span>
+        <span class="serie-phase" id="sphase_${sid}"></span>
+        <span id="stdisp_${sid}" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);flex-shrink:0;display:none"></span>
+      </div>`;
+    }
   }
+
   html += `</div>`;
   return html;
 }

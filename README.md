@@ -10,21 +10,25 @@ Application web autonome (fichier HTML unique) pour suivre un programme fitness 
 - **Samedi** — Grande séance 1h–1h30 : échauffement + gainage pré-muscu + musculation haltères/banc + étirements
 - **Dimanche** — Yoga doux 45–60 min adapté (dos raide, ventre proéminent)
 
-### Suivi des exercices
-- Cases à cocher par série avec état persistant
-- **Exercices en durée** : timer automatique par série avec 3 bips audio distincts (début / mi-temps / fin) + timer de repos enchaîné automatiquement
-- **Exercices en répétitions** : case à cocher par série + timer de repos (60 s) déclenché à la validation + bip de fin de repos
-- Détails de chaque série affichés (nombre de reps, poids, tempo)
-- Navigation par semaine avec historique
+### Suivi des séries
+- **Exercices en durée** : timer automatique par série/côté avec 3 bips audio distincts
+  - Bip aigu court — début
+  - Double bip médium — mi-temps
+  - Triple bip grave — fin de série
+  - Bip aigu montant — fin du temps de repos
+- **Exercices en répétitions** : case à cocher par série + timer de repos (60 s) déclenché automatiquement à la validation
+- **Exercices latéraux** (`/côté`) : lignes séparées Gauche / Droite avec timer individuel par côté — le repos ne se déclenche qu'après le second côté
+- Description de chaque série (reps, poids, tempo) affichée **une seule fois** en haut du bloc de séries
+- Navigation par semaine avec historique complet
 
 ### Journal quotidien
 - Notation de la séance (1 à 5 étoiles)
 - Ressenti en un clic (Fatigué / En forme / Difficile / Parfait / Douleur)
 - Zone de notes libre
-- Anneaux de progression par jour
+- Anneaux de progression par jour (jaune = en cours, vert = terminé)
 
 ### Synchronisation Google Drive
-- Stockage des données dans un fichier `fitness_programme_semaine.json` sur Drive
+- Stockage dans un fichier `fitness_programme_semaine.json` sur Drive
 - Sync automatique après chaque action (debounce 2 s)
 - Fallback localStorage si hors ligne
 - Restauration silencieuse de session au rechargement
@@ -70,13 +74,10 @@ Puis : **⋮ → Ajouter à l'écran d'accueil** pour créer un raccourci applic
    - `http://localhost`
    - `http://localhost:8080`
    - `https://seppastien.github.io`
-5. Coller le Client ID dans le fichier HTML à la ligne :
-   ```javascript
-   const GOOGLE_CLIENT_ID = 'VOTRE_CLIENT_ID.apps.googleusercontent.com';
-   ```
+5. Le Client ID est déjà intégré dans le fichier HTML
 6. Au premier lancement, cliquer **Connecter Drive** dans la barre de statut
 
-Les données sont stockées uniquement dans le fichier `fitness_programme_semaine.json` de ton Drive (scope `drive.file` restreint — aucun accès aux autres fichiers).
+Les données sont stockées uniquement dans `fitness_programme_semaine.json` sur Drive (scope `drive.file` restreint — aucun accès aux autres fichiers).
 
 ## Mise à jour du fichier
 
