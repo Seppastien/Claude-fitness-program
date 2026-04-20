@@ -739,6 +739,17 @@ function renderAllPanels() {
     container.appendChild(panel);
     // Bind events after DOM insert
     bindDayEvents(d.id, panel);
+    // Restore series visual state for already-validated exercises
+    const { checks } = loadData(d.id);
+    Object.keys(checks).forEach(exId => {
+      if (!checks[exId]) return;
+      const tracker = document.getElementById('st_' + d.id + '_' + exId);
+      if (!tracker) return;
+      tracker.querySelectorAll('.serie-check').forEach(chk => {
+        chk.classList.add('done');
+        chk.textContent = '✓';
+      });
+    });
   });
 }
 
@@ -884,6 +895,14 @@ function toggleEx(dayId, exId, sessionId) {
   if (!row) return;
   row.classList.toggle('checked', checks[exId]);
   row.querySelector('.ex-check').textContent = checks[exId]?'✓':'';
+  // Sync all series checks with the exercise state
+  const tracker = document.getElementById('st_' + dayId + '_' + exId);
+  if (tracker) {
+    tracker.querySelectorAll('.serie-check').forEach(chk => {
+      chk.classList.toggle('done', !!checks[exId]);
+      chk.textContent = checks[exId] ? '✓' : '';
+    });
+  }
   // Update session done badge
   updateSessionBadge(dayId, sessionId, checks);
   updateTabCount(dayId);
@@ -1017,7 +1036,7 @@ function parseReps(reps, totalSec) {
 // ── Render series tracker HTML ──
 function renderSeriesTracker(dayId, ex) {
   const { sets, secPerSide, restSec, lateral } = parseReps(ex.reps, ex.sec);
-  let html = `<div class="series-tracker" id="st_${dayId}_${ex.id}">`;
+  let html = `<div class="series-tracker" id="st_${dayId}_${ex.id}" data-day="${dayId}" data-ex="${ex.id}">`;
 
   if (lateral) {
     // 6 rows (for 3 sets): Gauche 1/3, Droite 1/3, Gauche 2/3 ...
@@ -1069,7 +1088,7 @@ function renderRepTracker(dayId, ex) {
   const lateral = /\/côté/.test(ex.reps);
   const restSec = 60;
   const info = ex.serieInfo || '';
-  let html = `<div class="series-tracker" id="st_${dayId}_${ex.id}">`;
+  let html = `<div class="series-tracker" id="st_${dayId}_${ex.id}" data-day="${dayId}" data-ex="${ex.id}">`;
   if (info) html += `<span class="serie-info">${info}</span>`;
 
   if (lateral) {
@@ -1115,6 +1134,7 @@ function repSerieCheck(sid, restSec, isLast) {
     chk.classList.remove('done'); chk.textContent = '';
     if (phase) { phase.textContent = ''; phase.className = 'serie-phase'; }
     if (disp) disp.style.display = 'none';
+    syncExValidation(chk);
     return;
   }
 
@@ -1129,6 +1149,7 @@ function repSerieCheck(sid, restSec, isLast) {
 
   // Check the serie
   chk.classList.add('done'); chk.textContent = '✓';
+  syncExValidation(chk);
   beepEnd();
 
   // No rest after last set
@@ -1240,11 +1261,50 @@ function startSerieTimer(sid, secPerSet, restSec, serieIdx, totalSets) {
   }, 1000);
 }
 
+function getSessionIdForEx(dayId, exId) {
+  const sessions = getSessionsForDay(dayId);
+  if (!sessions) return null;
+  for (const s of sessions) {
+    if (s.exercises && s.exercises.some(ex => ex.id === exId)) return s.id;
+  }
+  return null;
+}
+
+function syncExValidation(chk) {
+  const tracker = chk.closest('.series-tracker');
+  if (!tracker) return;
+  const dayId = tracker.dataset.day;
+  const exId = tracker.dataset.ex;
+  if (!dayId || !exId) return;
+  const allDone = Array.from(tracker.querySelectorAll('.serie-check')).every(c => c.classList.contains('done'));
+  const { checks } = loadData(dayId);
+  if (allDone && !checks[exId]) {
+    checks[exId] = true;
+    saveChecks(dayId, checks);
+    const row = document.getElementById('exrow_' + dayId + '_' + exId);
+    if (row) { row.classList.add('checked'); row.querySelector('.ex-check').textContent = '✓'; }
+    const sessionId = getSessionIdForEx(dayId, exId);
+    if (sessionId) updateSessionBadge(dayId, sessionId, checks);
+    updateTabCount(dayId);
+    renderOverview();
+  } else if (!allDone && checks[exId]) {
+    checks[exId] = false;
+    saveChecks(dayId, checks);
+    const row = document.getElementById('exrow_' + dayId + '_' + exId);
+    if (row) { row.classList.remove('checked'); row.querySelector('.ex-check').textContent = ''; }
+    const sessionId = getSessionIdForEx(dayId, exId);
+    if (sessionId) updateSessionBadge(dayId, sessionId, checks);
+    updateTabCount(dayId);
+    renderOverview();
+  }
+}
+
 function toggleSerieCheck(sid) {
   const chk = document.getElementById('schk_'+sid);
   if (!chk) return;
   chk.classList.toggle('done');
   chk.textContent = chk.classList.contains('done') ? '✓' : '';
+  syncExValidation(chk);
 }
 
 // ── Fallback timer (unused but kept for safety) ──
@@ -1254,7 +1314,7 @@ function toggleTimer(id, total) {}
 function renderSubExoTracker(dayId, ex) {
   const sets = ex.sets || 1;
   const subs = ex.subExos || [];
-  let html = `<div class="series-tracker" id="st_${dayId}_${ex.id}">`;
+  let html = `<div class="series-tracker" id="st_${dayId}_${ex.id}" data-day="${dayId}" data-ex="${ex.id}">`;
   for (let i = 0; i < sets; i++) {
     subs.forEach((sub, j) => {
       const sid = `${dayId}_${ex.id}_s${i}_sub${j}`;
