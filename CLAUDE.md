@@ -6,7 +6,7 @@ Guide de développement pour Claude. Ce fichier décrit l'architecture, les conv
 
 ## Vue d'ensemble
 
-Fichier unique : `programme_semaine.html` (~1260 lignes)
+Fichier unique : `programme_semaine.html` (~1430 lignes)
 Aucune dépendance externe. Tout est en HTML/CSS/JS vanilla dans un seul fichier.
 
 ---
@@ -15,7 +15,7 @@ Aucune dépendance externe. Tout est en HTML/CSS/JS vanilla dans un seul fichier
 
 ```
 programme_semaine.html
-├── <style>          CSS complet (variables, composants, series tracker)
+├── <style>          CSS complet (variables, composants, series tracker, repli)
 ├── <body>           Topbar + sync bar + overview rings + day tabs + panels
 └── <script>
     ├── DATA         Constantes DAYS, TYPE_LABELS, SESSIONS
@@ -24,9 +24,11 @@ programme_semaine.html
     ├── RENDER       getSessionsForDay, countExercises, renderAllPanels,
     │                renderDayPanel, renderSeriesTracker, renderRepTracker,
     │                renderSubExoTracker, renderOverview, renderTabs
-    ├── INTERACTIONS toggleEx, toggleVelo, setStar, setFeeling, saveJournalEntry
+    ├── INTERACTIONS toggleEx, toggleVelo, setStar, setFeeling, saveJournalEntry,
+    │                syncExValidation, toggleSerieCheck, repSerieCheck
     ├── TIMERS       beep*, parseReps, parseRepSets, isDurationEx,
-    │                startSerieTimer, repSerieCheck, toggleSerieCheck
+    │                startSerieTimer, renderSeriesTracker, renderRepTracker
+    ├── REPLI        toggleSession, toggleExCollapse
     └── WEEK NAV     changeWeek, updateWeekDisplay, init()
 ```
 
@@ -59,6 +61,8 @@ SESSIONS = {
   isVelo: true,               // cas spécial — affiche la carte vélo
   isMuscu: true,              // cas spécial musculation
   isYoga: true,               // cas spécial yoga
+  veloDir: 'aller|retour',    // uniquement si isVelo
+  veloStats: { km, duree, cal, difficulte }, // uniquement si isVelo
 }
 ```
 
@@ -85,7 +89,7 @@ SESSIONS = {
 
 ## Types d'affichage des séries
 
-Il existe **4 types** selon la nature de l'exercice. Ne pas les confondre.
+Il existe **7 types** selon la nature de l'exercice. Ne pas les confondre.
 
 | Type | Détection | Rendu | Exemple |
 |------|-----------|-------|---------|
@@ -136,6 +140,112 @@ Les bips sont déclenchés uniquement sur les exercices en durée (`isDurationEx
 
 ---
 
+## Logique d'ouverture automatique (sessions & exercices)
+
+### Sessions
+
+Au rendu (`renderDayPanel`), deux index sont calculés pour déterminer quelle session afficher ouverte :
+
+```javascript
+// Dernier index d'une session entièrement terminée
+const lastDoneIdx = sessions.reduce((found, s, idx) => {
+  if (s.exercises && s.exercises.every(ex => checks[ex.id])) return idx;
+  return found;
+}, -1);
+
+// Première session incomplète APRÈS la dernière session terminée
+const targetOpenIdx = sessions.findIndex((s, idx) =>
+  idx > lastDoneIdx && s.exercises && !s.exercises.every(ex => checks[ex.id])
+);
+```
+
+**Règle :** une session est rendue `collapsed` si elle est terminée (`allDone`) OU si son index n'est pas `targetOpenIdx`. Cela garantit qu'une seule session reste ouverte à la fois : la prochaine à faire.
+
+- Les sessions vélo (`isVelo`) ne participent pas à ce calcul (pas de `exercises`).
+- Quand toutes les sessions sont terminées, `targetOpenIdx` vaut -1 et toutes se replient.
+
+### Exercices
+
+À l'intérieur d'une session ouverte, seul **le premier exercice non coché** reste déplié. Tous les exercices cochés ET tous ceux qui viennent après le premier ouvert se replient :
+
+```javascript
+let firstOpenExFound = false;
+// Pour chaque exercice :
+const exCollapsed = !!checked || firstOpenExFound;
+if (!checked && !firstOpenExFound) firstOpenExFound = true;
+```
+
+Quand un exercice en durée (`startSerieTimer`) atteint la dernière série, il se replie automatiquement après 800 ms et déplie le suivant :
+
+```javascript
+setTimeout(() => {
+  exItem.classList.add('collapsed');
+  const next = exItem.nextElementSibling;
+  if (next && next.classList.contains('ex-item')) next.classList.remove('collapsed');
+}, 800);
+```
+
+---
+
+## Validation bidirectionnelle séries ↔ exercice
+
+La fonction `syncExValidation(chk)` maintient la cohérence entre l'état des cases série et l'état global de l'exercice :
+
+- **Toutes les séries cochées** → l'exercice passe à `checked`, sauvegarde, met à jour badge/onglet/overview.
+- **Au moins une série décochée** → l'exercice repasse à `unchecked` si il était coché.
+
+Sens inverse (`toggleEx`) : cocher/décocher l'exercice directement (case principale) synchronise **toutes** les cases série du tracker (`serie-check`) dans le même état.
+
+---
+
+## Auto-démarrage de la série suivante (timers durée)
+
+Dans `startSerieTimer`, à la fin de la phase de repos (reste ≤ 0), la série suivante démarre automatiquement via un `.click()` sur le bouton suivant dans le tracker :
+
+```javascript
+if (serieIdx + 1 < totalSets) {
+  const allBtns = tracker.querySelectorAll('.serie-timer-btn');
+  if (allBtns[serieIdx + 1]) allBtns[serieIdx + 1].click();
+}
+```
+
+Cela crée une chaîne travail → repos → travail → repos … entièrement automatique une fois le premier démarrage lancé.
+
+---
+
+## parseReps vs parseRepSets
+
+Deux fonctions distinctes selon le contexte :
+
+| Fonction | Utilisée par | Retourne |
+|----------|-------------|---------|
+| `parseReps(reps, totalSec)` | `renderSeriesTracker` (durée) | `{ sets, secPerSide, restSec, lateral }` |
+| `parseRepSets(reps)` | `renderRepTracker` (reps) | `sets` (nombre entier) |
+
+`parseRepSets` utilise le pattern `/^(\d+)\s*[×x]\s*(\d)/` — il exige un **chiffre après le ×**. Cela évite que `"10 × chaque sens"` ou `"10 souffles"` soient interprétés comme 10 séries.
+
+---
+
+## États de repSerieCheck (reps)
+
+La case d'une série reps a **trois comportements** selon l'état courant :
+
+1. **Non cochée, pas de timer** → coche, lance le décompte de repos (sauf dernière série).
+2. **Cochée, timer en cours** → annule le timer de repos, remet l'affichage à zéro.
+3. **Cochée, pas de timer** → décoche (permet la correction manuelle).
+
+---
+
+## Système de repli (collapse)
+
+- **Session** : `session-card.collapsed` cache `.ex-list` et `.note-banner` via CSS.
+- **Exercice** : `ex-item.collapsed` cache `.series-tracker` via CSS.
+- `toggleSession(event, dayId, sessionId)` : toggle sur la carte ciblée par `data-sid`.
+- `toggleExCollapse(event, dayId, exId)` : toggle sur `#exitem_{dayId}_{exId}`.
+- `event.stopPropagation()` dans les deux handlers pour éviter la propagation vers le parent.
+
+---
+
 ## Persistance des données
 
 ### Structure localStorage / Drive
@@ -152,8 +262,10 @@ journal = { rating: 1-5, feeling: 'string', note: 'string' }
 
 - Fichier unique : `fitness_programme_semaine.json`
 - Scope : `drive.file` (accès restreint au fichier créé par l'app)
-- Sync : debounce 2 s après chaque action
+- Sync : debounce 2 s après chaque action (`scheduleSave`)
 - Fallback : localStorage si non connecté
+- Au chargement : merge localStorage + Drive (`Object.assign({}, local, remote)` — Drive prioritaire)
+- Token restauré silencieusement via `tryRestoreToken()` (appelé 800 ms après init)
 
 ---
 
@@ -172,7 +284,15 @@ journal = { rating: 1-5, feeling: 'string', note: 'string' }
 | `s_p*`  | Samedi post-effort |
 | `d_y*`  | Dimanche yoga |
 
-Les IDs de séries sont générés dynamiquement : `{dayId}_{exId}_s{i}` pour les séries simples, `{dayId}_{exId}_s{i}_G/D` pour les latéraux, `{dayId}_{exId}_s{i}_sub{j}` pour les subExos.
+### IDs dynamiques (séries)
+
+| Pattern | Cas |
+|---------|-----|
+| `{dayId}_{exId}_s{i}` | Série simple |
+| `{dayId}_{exId}_s{i}_G` / `_D` | Série latérale Gauche/Droite |
+| `{dayId}_{exId}_s{i}_sub{j}` | SubExo (exercice combiné) |
+
+Ces IDs sont utilisés comme clés dans l'objet `serieTimers` et comme suffixes des éléments DOM `schk_`, `stbtn_`, `stdisp_`, `sphase_`, `srow_`.
 
 ---
 
@@ -184,3 +304,5 @@ Les IDs de séries sont générés dynamiquement : `{dayId}_{exId}_s{i}` pour le
 - **subExos** : le champ `sec` de l'exercice parent n'est pas utilisé pour le rendu (chaque `sub.sec` est indépendant)
 - **Ne jamais ouvrir en `file://`** : l'OAuth Google requiert `http://localhost`
 - **Après modification** : commit + push GitHub Desktop → attendre 1-2 min pour GitHub Pages
+- **parseRepSets** : ne jamais mettre un format `"N × texte"` où N > 1 si c'est une seule série — ça créerait N fausses séries
+- **Ajouter un subExo** : `sets` doit être défini sur l'exercice parent ; le repos entre cycles (fin de chaque cycle complet) est 15 s — entre les postures d'un même cycle : 0 s

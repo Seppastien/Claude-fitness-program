@@ -10,31 +10,51 @@ Application web autonome (fichier HTML unique) pour suivre un programme fitness 
 - **Samedi** — Grande séance 1h–1h30 : échauffement + gainage pré-muscu + musculation haltères/banc + étirements
 - **Dimanche** — Yoga doux 45–60 min adapté (dos raide, ventre proéminent)
 
+### Navigation intelligente (auto-ouverture)
+
+L'interface adapte automatiquement ce qui est affiché selon l'avancement :
+
+- **Sessions** : une seule session est dépliée à la fois — la prochaine à faire dans la journée. Les sessions terminées se replient automatiquement. Un clic sur l'en-tête d'une session permet de la déplier/replier manuellement.
+- **Exercices** : à l'intérieur d'une session ouverte, seul le premier exercice non coché reste visible. Les exercices terminés se replient. À la fin d'un exercice en durée, l'exercice suivant s'ouvre automatiquement 800 ms après la dernière série.
+
 ### Suivi des séries
+
 - **Exercices en durée** : timer automatique par série/côté avec 3 bips audio distincts
-  - Bip aigu court — début
+  - Bip aigu court — début de série
   - Double bip médium — mi-temps
   - Triple bip grave — fin de série
   - Bip aigu montant — fin du temps de repos
+  - **Enchaînement automatique** : à la fin du repos, la série suivante démarre sans intervention
+  - À la fin de la dernière série : l'exercice se coche et l'exercice suivant s'ouvre
 - **Exercices en répétitions** : case à cocher par série + timer de repos (60 s) déclenché automatiquement à la validation
+  - Cliquer à nouveau pendant le repos annule le décompte
+  - Cliquer sur une série déjà cochée (hors repos) la décoche (correction)
 - **Exercices latéraux** (`/côté`) : lignes séparées Gauche / Droite avec timer individuel par côté — le repos ne se déclenche qu'après le second côté
 - **Exercices alternés continus** (crunch bicycle, superman, planche tap) : séries simples sans séparation gauche/droite — serieInfo indique le total de cycles
 - **Exercices alternés avec pause** (Bird Dog, Dead Bug) : séries simples, alternance fluide gauche/droite au sein de chaque série — serieInfo précise le nombre de reps par côté
-- **Exercices combinés** (Sphinx → Enfant) : postures alternées au sein d'un même exercice, chacune avec son propre timer — mécanisme `subExos` réutilisable
+- **Exercices combinés** (Sphinx → Enfant) : postures alternées au sein d'un même exercice, chacune avec son propre timer — repos 15 s entre les cycles, 0 s entre les postures d'un même cycle
 - Description de chaque série (reps, poids, tempo) affichée **une seule fois** en haut du bloc de séries
-- Navigation par semaine avec historique complet
+
+### Validation synchronisée
+
+Les cases séries et la case principale de l'exercice restent toujours cohérentes :
+- Cocher toutes les séries → l'exercice se valide automatiquement
+- Décocher une série déjà validée → l'exercice repasse à non terminé
+- Cocher/décocher la case principale de l'exercice → toutes les séries suivent
 
 ### Journal quotidien
 - Notation de la séance (1 à 5 étoiles)
 - Ressenti en un clic (Fatigué / En forme / Difficile / Parfait / Douleur)
 - Zone de notes libre
-- Anneaux de progression par jour (jaune = en cours, vert = terminé)
+- Anneaux de progression par jour dans la barre d'en-tête (jaune = en cours, vert = terminé)
+- Navigation par semaine avec historique complet
 
 ### Synchronisation Google Drive
 - Stockage dans un fichier `fitness_programme_semaine.json` sur Drive
-- Sync automatique après chaque action (debounce 2 s)
+- Sync automatique après chaque action (debounce 2 s — plusieurs actions rapides = 1 seul envoi)
 - Fallback localStorage si hors ligne
-- Restauration silencieuse de session au rechargement
+- Restauration silencieuse de session au rechargement de page
+- En cas de conflit : les données Drive sont prioritaires sur le cache local
 
 ## Équipement requis
 

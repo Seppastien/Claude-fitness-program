@@ -432,7 +432,10 @@ const SESSIONS = {
 // ╔══════════════════════════════════════════════╗
 // ║  STATE — Variables globales & helpers date   ║
 // ╚══════════════════════════════════════════════╝
-// currentWeekOffset, activeDay, timers, serieTimers, driveState
+// currentWeekOffset : décalage en semaines par rapport à aujourd'hui (0 = semaine courante)
+// activeDay         : id du jour affiché (ex: 'lun', 'mar'...)
+// timers            : réservé (non utilisé activement, conservé pour compatibilité)
+// serieTimers       : map sid → { interval, remaining, phase } pour chaque série en cours
 let currentWeekOffset = 0;
 let activeDay = 'lun';
 const timers = {};
@@ -600,6 +603,7 @@ async function saveToDrive() {
 }
 
 // ── Planification de sauvegarde & storage API ──
+// Debounce 2 s : regroupe les sauvegardes multiples (ex: cocher 3 séries d'affilée → 1 seul appel Drive)
 function scheduleSave() {
   if (driveState.saveTimer) clearTimeout(driveState.saveTimer);
   driveState.saveTimer = setTimeout(() => { if (driveState.connected) saveToDrive(); }, 2000);
@@ -787,6 +791,10 @@ function renderDayPanel(day) {
   if (!sessions) {
     html += `<div class="soon-card"><div class="soon-icon">🗓️</div><div class="soon-title">Aucune séance prévue</div></div>`;
   } else {
+    // lastDoneIdx : dernier index d'une session entièrement cochée (toutes les exercises.checked).
+    // targetOpenIdx : première session APRÈS lastDoneIdx qui n'est pas finie.
+    // Résultat : une seule session reste dépliée — la prochaine à faire dans la journée.
+    // Les sessions vélo (isVelo) ne participent pas au calcul car elles n'ont pas de exercises[].
     const lastDoneIdx = sessions.reduce((found, s, idx) => {
       if (s.exercises && s.exercises.every(ex => checks[ex.id])) return idx;
       return found;
@@ -818,6 +826,8 @@ function renderDayPanel(day) {
         const allDone = s.exercises.every(ex => checks[ex.id]);
         const sessionCollapsed = allDone || sIdx !== targetOpenIdx;
 
+        // firstOpenExFound : flag one-shot pour ne laisser ouvert que le premier exercice non coché.
+        // Tous les exercices cochés ET tous ceux qui suivent le premier ouvert sont repliés.
         let firstOpenExFound = false;
         const exListHtml = s.exercises.map((ex,i) => {
           const checked = checks[ex.id] ? 'checked' : '';
@@ -892,6 +902,9 @@ function renderDayPanel(day) {
 
 function bindDayEvents(dayId, panel) { /* events are inline for simplicity */ }
 
+// toggleEx : case principale de l'exercice (non via les séries).
+// Sens inverse de syncExValidation : force toutes les serie-check du tracker
+// à l'état coché/décoché pour rester cohérent avec l'exercice parent.
 function toggleEx(dayId, exId, sessionId) {
   const { checks } = loadData(dayId);
   checks[exId] = !checks[exId];
@@ -1025,12 +1038,14 @@ function isDurationEx(ex) {
   return /\d+\s*s/.test(ex.reps) || /\d+\s*min/.test(ex.reps);
 }
 
-// ── Parse reps string → { sets, secPerSet, restSec, lateral } ──
+// parseReps : utilisée par renderSeriesTracker (exercices en DURÉE uniquement).
+// Divise totalSec par (sets × 2) si latéral, sinon par sets.
+// restSec est déduit de la durée par côté : ≥40 s → 20 s de repos, sinon 15 s.
 function parseReps(reps, totalSec) {
   const lateral = /\/côté/.test(reps);
   const setMatch = reps.match(/^(\d+)\s*[×x]/);
   const sets = setMatch ? parseInt(setMatch[1]) : 1;
-  // If lateral: totalSec covers ALL sets × 2 sides, so sec per side per set = totalSec / (sets*2)
+  // Si latéral : totalSec couvre TOUS les sets × 2 côtés → sec par côté par set = totalSec / (sets*2)
   const secPerSide = lateral
     ? Math.round(totalSec / (sets * 2))
     : Math.round(totalSec / sets);
@@ -1080,10 +1095,10 @@ function renderSeriesTracker(dayId, ex) {
 }
 
 // ── Render rep-based series tracker (checkboxes + rest timer) ──
+// parseRepSets : utilisée par renderRepTracker (exercices en REPS uniquement).
+// Exige un chiffre immédiatement après le × pour distinguer "3 × 12" (3 séries)
+// de "10 × chaque sens" ou "10 souffles" qui doivent rester à 1 seule série.
 function parseRepSets(reps) {
-  // Only treat as multiple sets if pattern is "N × NUMBER" (digit after the ×)
-  // e.g. "3 × 12" → 3 sets, "3 × 8 /côté" → 3 sets
-  // but "10 × chaque sens", "10 répétitions", "10 souffles" → 1 set
   const m = reps.match(/^(\d+)\s*[×x]\s*(\d)/);
   return m ? parseInt(m[1]) : 1;
 }
@@ -1128,13 +1143,17 @@ function renderRepTracker(dayId, ex) {
   return html;
 }
 
+// repSerieCheck : gère 3 états pour une case série de type "reps".
+//   État 1 — non cochée, pas de timer → coche + lance décompte repos (sauf dernière série).
+//   État 2 — cochée + timer repos en cours → annule le timer (correction en cours de repos).
+//   État 3 — cochée, pas de timer → décoche (correction manuelle possible).
 function repSerieCheck(sid, restSec, isLast) {
   const chk = document.getElementById('schk_'+sid);
   const phase = document.getElementById('sphase_'+sid);
   const disp = document.getElementById('stdisp_'+sid);
   if (!chk) return;
 
-  // Toggle off if already checked and no timer running
+  // État 3 : déjà cochée, pas de timer → décoche (correction)
   if (chk.classList.contains('done') && (!serieTimers[sid] || !serieTimers[sid].interval)) {
     chk.classList.remove('done'); chk.textContent = '';
     if (phase) { phase.textContent = ''; phase.className = 'serie-phase'; }
@@ -1143,7 +1162,7 @@ function repSerieCheck(sid, restSec, isLast) {
     return;
   }
 
-  // Stop rest timer if running
+  // État 2 : timer repos en cours → annule
   if (serieTimers[sid] && serieTimers[sid].interval) {
     clearInterval(serieTimers[sid].interval);
     serieTimers[sid] = null;
@@ -1152,7 +1171,7 @@ function repSerieCheck(sid, restSec, isLast) {
     return;
   }
 
-  // Check the serie
+  // État 1 : coche la série
   chk.classList.add('done'); chk.textContent = '✓';
   syncExValidation(chk);
   beepEnd();
@@ -1192,13 +1211,17 @@ function repSerieCheck(sid, restSec, isLast) {
 // ── Series timer state ──
 const serieTimers = {};
 
+// startSerieTimer : timer pour les exercices en durée (isDurationEx).
+// Cycle automatique : travail → repos → démarrage auto série suivante.
+// serieIdx/totalSets permettent de détecter la dernière série et d'enchaîner via .click().
+// Phases : 'work' (décompte avec bips mi-temps/fin) puis 'rest' (décompte repos en or).
 function startSerieTimer(sid, secPerSet, restSec, serieIdx, totalSets) {
   const btn = document.getElementById('stbtn_'+sid);
   const disp = document.getElementById('stdisp_'+sid);
   const phase = document.getElementById('sphase_'+sid);
   if (!btn) return;
 
-  // Stop if already running
+  // Stop si déjà en cours → reset
   if (serieTimers[sid] && serieTimers[sid].interval) {
     clearInterval(serieTimers[sid].interval);
     serieTimers[sid] = null;
@@ -1237,7 +1260,7 @@ function startSerieTimer(sid, secPerSet, restSec, serieIdx, totalSets) {
           chk.classList.add('done'); chk.textContent = '✓';
         }
         if (serieIdx === totalSets - 1) {
-          // Dernière série — valider l'exercice et ouvrir le suivant
+          // Dernière série : valide l'exercice, replie le ex-item et ouvre le suivant après 800 ms
           clearInterval(st.interval);
           serieTimers[sid] = null;
           btn.classList.remove('running');
@@ -1281,7 +1304,7 @@ function startSerieTimer(sid, secPerSet, restSec, serieIdx, totalSets) {
           pb.innerHTML = `✓ <span id="stdisp_${sid}">0:00</span>`;
         }
         if (phase) { phase.textContent = 'Série suivante !'; phase.className = 'serie-phase active-phase'; }
-        // Auto-démarrer la série suivante
+        // Auto-démarrer la série suivante via .click() sur le bouton du tracker
         if (serieIdx + 1 < totalSets) {
           const currentBtn = document.getElementById('stbtn_'+sid);
           if (currentBtn) {
@@ -1306,6 +1329,10 @@ function getSessionIdForEx(dayId, exId) {
   return null;
 }
 
+// syncExValidation : maintient la cohérence séries ↔ exercice dans les deux sens.
+// Appelée après chaque changement d'une case série (repSerieCheck, toggleSerieCheck, startSerieTimer).
+// - Toutes les série-check "done" → marque l'exercice checked, sauvegarde, rafraîchit badge/onglet/overview.
+// - Au moins une série décochée → démarque l'exercice si il était checked.
 function syncExValidation(chk) {
   const tracker = chk.closest('.series-tracker');
   if (!tracker) return;
@@ -1343,10 +1370,13 @@ function toggleSerieCheck(sid) {
   syncExValidation(chk);
 }
 
-// ── Fallback timer (unused but kept for safety) ──
+// toggleTimer : stub conservé pour éviter des erreurs si un ancien onclick en HTML y fait référence
 function toggleTimer(id, total) {}
 
-// ── Render alternating sub-exercise tracker ──
+// renderSubExoTracker : pour les exercices avec subExos (ex: Sphinx→Enfant).
+// Chaque cycle = N postures enchaînées, répété `sets` fois.
+// Repos 15 s uniquement après la dernière posture de chaque cycle (pas entre postures).
+// Le sid suit le pattern {dayId}_{exId}_s{i}_sub{j}.
 function renderSubExoTracker(dayId, ex) {
   const sets = ex.sets || 1;
   const subs = ex.subExos || [];
@@ -1355,7 +1385,7 @@ function renderSubExoTracker(dayId, ex) {
     subs.forEach((sub, j) => {
       const sid = `${dayId}_${ex.id}_s${i}_sub${j}`;
       const isLast = (i === sets-1 && j === subs.length-1);
-      const restSec = (j === subs.length-1) ? 15 : 0; // rest only after full cycle
+      const restSec = (j === subs.length-1) ? 15 : 0; // repos après fin de cycle uniquement
       html += `<div class="series-row" id="srow_${sid}">
         <div class="serie-check" id="schk_${sid}" onclick="toggleSerieCheck('${sid}')"></div>
         <span class="serie-label">${sub.name} ${i+1}/${sets}</span>
@@ -1411,11 +1441,13 @@ function updateWeekDisplay() {
 // ╔══════════════════════════════════════════════╗
 // ║  INIT — Point d'entrée                       ║
 // ╚══════════════════════════════════════════════╝
-// Détecte le jour courant, charge les données, rend l'UI
+// Détecte le jour courant, charge les données, rend l'UI.
+// tryRestoreToken est différé à 800 ms pour laisser le temps à la lib Google de charger.
+// dayMap convertit getDay() (0=dim) vers l'index dans DAYS (0=lun..6=dim).
 
 (function init() {
   const jsDay = new Date().getDay(); // 0=dim, 1=lun...
-  const dayMap = [6,0,1,2,3,4,5]; // JS day → index in DAYS
+  const dayMap = [6,0,1,2,3,4,5]; // JS Sunday=0 → DAYS index 6 (dim), Monday=1 → 0 (lun)...
   activeDay = DAYS[dayMap[jsDay] ?? 0].id;
   updateWeekDisplay();
   renderAllPanels();
