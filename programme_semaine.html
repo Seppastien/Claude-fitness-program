@@ -263,7 +263,7 @@ const SESSIONS = {
         {id:'b_m1', name:'Respiration diaphragmatique', desc:'Allongé, gonfle le ventre, tiens 5 s. Active le transverse.', reps:'10 souffles', sec:90, type:'gainage', serieInfo:'10 souffles · inspire 4 s · tenu 5 s · expire 6 s'},
         {id:'b_m2', name:'Knee-to-chest', desc:'Genoux ramenés vers la poitrine, maintiens doucement 30 s. Décompresse les lombaires.', reps:'3 × 30 s', sec:90, type:'etirement'},
         {id:'b_m3', name:'Cat-Cow', desc:'À 4 pattes, alterne dos rond (expire) et dos creusé (inspire). Réchauffe la colonne.', reps:'10 rép. lentes', sec:120, type:'etirement', serieInfo:'10 cycles · 6 s par cycle · synchronisé respiration'},
-        {id:'b_m4', name:'Bird Dog', desc:'Bras et jambe opposée tendus, tiens 3 s. Gainage profond anti-rotation.', reps:'3 × 8 /côté', sec:480, type:'gainage', serieInfo:'8 reps/côté · tenu 3 s · montée 1 s'},
+        {id:'b_m4', name:'Bird Dog', desc:'Bras et jambe opposée tendus, tiens 3 s. Gainage profond anti-rotation.', reps:'3 × 8', sec:480, type:'gainage', serieInfo:'8 reps/côté alternés · tenu 3 s · retour avant changement'},
         {id:'b_m5', name:'Pont fessier', desc:'Hanches en l\'air, tiens 3 s. Renforce fessiers et lombaires.', reps:'3 × 10', sec:180, type:'gainage', serieInfo:'10 reps · tenu 3 s · descente lente 2 s'},
       ]
     },
@@ -296,8 +296,8 @@ const SESSIONS = {
       desc:'Avant le début du travail · 20–22 min', duration:'20–22 min',
       exercises:[
         {id:'t_m1', name:'Respiration + activation transverse', desc:'Expire fort, rentre le ventre, tiens 5 s. Active le corset naturel.', reps:'10 souffles', sec:90, type:'gainage', serieInfo:'10 souffles · expire fort · tenu 5 s · relâche 4 s'},
-        {id:'t_m2', name:'Dead Bug', desc:'Bras vers plafond, genoux 90°. Descends bras+jambe opposée. Dos plaqué au sol.', reps:'3 × 8 /côté', sec:480, type:'gainage', serieInfo:'8 reps/côté · descente 3 s · remontée 2 s'},
-        {id:'t_m3', name:'Bird Dog', desc:'À 4 pattes, étends bras et jambe opposée. Tiens 3 s. Ne laisse pas le bassin tourner.', reps:'3 × 8 /côté', sec:480, type:'gainage', serieInfo:'8 reps/côté · tenu 3 s · contrôlé'},
+        {id:'t_m2', name:'Dead Bug', desc:'Bras vers plafond, genoux 90°. Descends bras+jambe opposée. Dos plaqué au sol.', reps:'3 × 8', sec:480, type:'gainage', serieInfo:'8 reps/côté alternés · descente 3 s · remontée 2 s'},
+        {id:'t_m3', name:'Bird Dog', desc:'À 4 pattes, étends bras et jambe opposée. Tiens 3 s. Ne laisse pas le bassin tourner.', reps:'3 × 8', sec:480, type:'gainage', serieInfo:'8 reps/côté alternés · tenu 3 s · contrôlé'},
         {id:'t_m4', name:'Pont fessier + tenu', desc:'Hanches en l\'air, serre fessiers et abdos. Tiens 3 s. Descends lentement.', reps:'3 × 10', sec:180, type:'gainage', serieInfo:'10 reps · tenu 3 s · descente 2 s'},
         {id:'t_m5', name:'Planche avant', desc:'Avant-bras, corps aligné, ventre rentré. Respire normalement. Tiens sans apnée.', reps:'3 × 20 s', sec:120, type:'gainage'},
         {id:'t_m6', name:'Rotation lombaire douce', desc:'Genoux croisés de l\'autre côté, allongé. Décompression avant la journée assise.', reps:'2 × 40 s /côté', sec:160, type:'etirement'},
@@ -308,11 +308,11 @@ const SESSIONS = {
       desc:'Pause déjeuner · sans saut, sans impact · 20–23 min', duration:'20–23 min',
       exercises:[
         {id:'t_mi1', name:'Step touch dynamique', desc:'Pas latéraux rapides avec bras actifs (ouverture/fermeture en rythme). Cardio sans impact ni saut, silencieux, adapté appartement.', reps:'3 min', sec:180, type:'cardio'},
-        {id:'t_mi2', name:'Crunch bicycle', desc:'Coude vers genou opposé en alternance, lent et contrôlé. Pas de coup de nuque.', reps:'3 × 16 /côté', sec:360, type:'gainage', serieInfo:'16 reps/côté · 2 s par rotation · sans à-coup'},
+        {id:'t_mi2', name:'Crunch bicycle', desc:'Coude vers genou opposé en alternance, lent et contrôlé. Pas de coup de nuque.', reps:'3 × 16', sec:360, type:'gainage', serieInfo:'16 cycles alternés · 2 s par cycle · sans à-coup'},
         {id:'t_mi3', name:'Hollow Body Hold', desc:'Bras au-dessus de la tête, jambes tendues à 30°. Dos plaqué. Contraction intense.', reps:'4 × 15 s', sec:120, type:'gainage'},
         {id:'t_mi4', name:'Mountain Climbers sol lent', desc:'Position pompe basse, genoux vers poitrine en alternance très lentement (3 s /jambe). Aucun impact, gainage intense + rythme cardiaque modéré.', reps:'3 × 20 s', sec:120, type:'cardio'},
         {id:'t_mi5', name:'Side Plank', desc:'Avant-bras, corps aligné de côté, hanches levées. Travaille les obliques.', reps:'3 × 20 s /côté', sec:120, type:'gainage'},
-        {id:'t_mi6', name:'Superman allongé', desc:'À plat ventre, lève bras+jambe opposée. Renforce dos extenseur et fessiers.', reps:'3 × 10 (2 s)', sec:120, type:'gainage', serieInfo:'10 reps · tenu 2 s en haut · descente contrôlée'},
+        {id:'t_mi6', name:'Superman allongé', desc:'À plat ventre, lève bras+jambe opposée. Renforce dos extenseur et fessiers.', reps:'3 × 10 (2 s)', sec:120, type:'gainage', serieInfo:'10 cycles alternés · tenu 2 s en haut · descente contrôlée'},
         {id:'t_mi7', name:'Étirement hip flexor debout', desc:'En fente, avance le bassin. Contre le raccourcissement par la position assise.', reps:'2 × 30 s /côté', sec:120, type:'etirement'},
       ]
     },
@@ -320,11 +320,11 @@ const SESSIONS = {
       id:'soir_tele', emoji:'🌙', title:'Soir — Gainage intense + décompression',
       desc:'Fin de journée · 22–25 min', duration:'22–25 min',
       exercises:[
-        {id:'t_s1', name:'Planche dynamique (épaule-épaule)', desc:'En planche, touche l\'épaule opposée en alternance. Anti-rotation des abdos.', reps:'3 × 10 tap', sec:150, type:'gainage', serieInfo:'10 taps/côté · 2 s par tap · hanches stables'},
+        {id:'t_s1', name:'Planche dynamique (épaule-épaule)', desc:'En planche, touche l\'épaule opposée en alternance. Anti-rotation des abdos.', reps:'3 × 10 tap', sec:150, type:'gainage', serieInfo:'20 taps alternés · 2 s par tap · hanches stables'},
         {id:'t_s2', name:'Crunch jambes tendues', desc:'Jambes à 90°, monte les épaules sans balancer. Contracte fort en haut.', reps:'3 × 12', sec:150, type:'gainage', serieInfo:'12 reps · montée 1 s · tenu 1 s · descente 2 s'},
         {id:'t_s3', name:'Reverse Crunch', desc:'Lève le bassin en ramenant les genoux vers la poitrine. Abdos bas ciblés.', reps:'3 × 12', sec:150, type:'gainage', serieInfo:'12 reps · montée 1 s · descente contrôlée 2 s'},
         {id:'t_s4', name:'Side Plank avec dip', desc:'Descend et remonte la hanche. Obliques + renfort lombaire.', reps:'3 × 12 /côté', sec:240, type:'gainage', serieInfo:'12 reps/côté · descente 2 s · remontée 1 s'},
-        {id:'t_s5', name:'Dead Bug tempo lent', desc:'Même posture mais 5 s descente / 2 s pause / 3 s remontée. Difficulté par le tempo.', reps:'3 × 6 /côté', sec:360, type:'gainage', serieInfo:'6 reps/côté · descente 5 s · pause 2 s · remontée 3 s'},
+        {id:'t_s5', name:'Dead Bug tempo lent', desc:'Même posture mais 5 s descente / 2 s pause / 3 s remontée. Difficulté par le tempo.', reps:'3 × 6', sec:360, type:'gainage', serieInfo:'6 reps/côté alternés · descente 5 s · pause 2 s · remontée 3 s'},
         {id:'t_s6', name:'Knee-to-chest + torsion spinale', desc:'Genoux poitrine puis torsion lombaire. Décompression complète.', reps:'2 × 40 s /côté', sec:160, type:'etirement'},
       ]
     },
@@ -346,8 +346,8 @@ const SESSIONS = {
         id:'gainage_pre_sam', emoji:'🧱', title:'Gainage pré-musculation',
         desc:'Stabilise le dos avant les charges · 15 min', duration:'15 min',
         exercises:[
-          {id:'s_g1', name:'Dead Bug', desc:'Bras vers plafond, genoux 90°. Descends bras+jambe opposée lentement. Dos plaqué. Active les stabilisateurs profonds avant les haltères.', reps:'3 × 8 /côté', sec:480, type:'gainage', serieInfo:'8 reps/côté · descente 3 s · remontée 2 s'},
-          {id:'s_g2', name:'Bird Dog', desc:'À 4 pattes, bras et jambe opposée tendus 3 s. Prépare le gainage lombaire pour les exercices debout.', reps:'3 × 8 /côté', sec:480, type:'gainage', serieInfo:'8 reps/côté · tenu 3 s · retour contrôlé'},
+          {id:'s_g1', name:'Dead Bug', desc:'Bras vers plafond, genoux 90°. Descends bras+jambe opposée lentement. Dos plaqué. Active les stabilisateurs profonds avant les haltères.', reps:'3 × 8', sec:480, type:'gainage', serieInfo:'8 reps/côté alternés · descente 3 s · remontée 2 s'},
+          {id:'s_g2', name:'Bird Dog', desc:'À 4 pattes, bras et jambe opposée tendus 3 s. Prépare le gainage lombaire pour les exercices debout.', reps:'3 × 8', sec:480, type:'gainage', serieInfo:'8 reps/côté alternés · tenu 3 s · retour contrôlé'},
           {id:'s_g3', name:'Pont fessier tenu', desc:'Hanches en l\'air, serre fessiers + abdos, tiens 3 s. Active les chaînes postérieures avant le rowing et les développés.', reps:'3 × 10', sec:180, type:'gainage', serieInfo:'10 reps · tenu 3 s · descente 2 s'},
           {id:'s_g4', name:'Planche avant', desc:'Avant-bras, corps aligné, ventre rentré. Prépare la ceinture abdominale à stabiliser sous charge.', reps:'3 × 20 s', sec:120, type:'gainage'},
         ]
