@@ -18,6 +18,7 @@ Application web autonome (fichier HTML unique) pour suivre un programme fitness 
   - Bip aigu montant — fin du temps de repos
 - **Exercices en répétitions** : case à cocher par série + timer de repos (60 s) déclenché automatiquement à la validation
 - **Exercices latéraux** (`/côté`) : lignes séparées Gauche / Droite avec timer individuel par côté — le repos ne se déclenche qu'après le second côté
+- **Exercices alternés continus** (crunch bicycle, superman, planche tap) : séries simples sans séparation gauche/droite — le serieInfo indique le nombre total de cycles
 - Description de chaque série (reps, poids, tempo) affichée **une seule fois** en haut du bloc de séries
 - Navigation par semaine avec historique complet
 
