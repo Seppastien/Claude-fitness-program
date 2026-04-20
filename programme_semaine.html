@@ -92,7 +92,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .ex-row{display:flex;align-items:flex-start;gap:10px;padding:.7rem 1.25rem;transition:background .1s;cursor:pointer}
 .ex-row:hover{background:var(--surface2)}
 .ex-row.checked{opacity:.55}
-.ex-check{width:20px;height:20px;border:1.5px solid var(--border2);border-radius:5px;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;transition:all .15s;background:var(--surface)}
+.ex-check{width:20px;height:20px;border:1.5px solid var(--border2);border-radius:5px;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;transition:all .15s;background:var(--surface);cursor:pointer;padding:0;font-size:11px;color:white;font-family:inherit}
 .ex-row.checked .ex-check{background:var(--green);border-color:var(--green);color:white;font-size:11px}
 .ex-body{flex:1}
 .ex-name{font-size:13.5px;font-weight:500}
@@ -201,6 +201,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .charge-tag{font-family:'DM Mono',monospace;font-size:10px;background:#F0EAFA;color:#6A35A8;border:1px solid rgba(106,53,168,.15);padding:2px 7px;border-radius:5px;white-space:nowrap}
 .badge-yoga{background:#FAEAF0;color:#A03060}
 .badge-muscu{background:#F0EAFA;color:#6A35A8}
+
+/* ── REPLI SESSIONS & EXERCICES ── */
+.session-head{cursor:pointer;user-select:none}
+.session-toggle{background:none;border:none;cursor:pointer;padding:0 0 0 6px;color:var(--muted);font-size:16px;line-height:1;flex-shrink:0;transition:transform .2s;display:flex;align-items:center}
+.session-card.collapsed .session-toggle{transform:rotate(-90deg)}
+.session-card.collapsed .ex-list,.session-card.collapsed .note-banner{display:none}
+.ex-item{position:relative}
+.ex-toggle{background:none;border:none;cursor:pointer;padding:2px 4px;color:var(--muted2);font-size:15px;line-height:1;flex-shrink:0;transition:transform .2s;margin-top:1px;align-self:flex-start}
+.ex-toggle:hover{color:var(--text)}
+.ex-item.collapsed .series-tracker{display:none}
+.ex-item.collapsed .ex-toggle{transform:rotate(-90deg)}
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -765,6 +776,7 @@ function renderDayPanel(day) {
   if (!sessions) {
     html += `<div class="soon-card"><div class="soon-icon">🗓️</div><div class="soon-title">Aucune séance prévue</div></div>`;
   } else {
+    let firstOpenSessionFound = false;
     sessions.forEach(s => {
       if (s.isVelo) {
         const isChecked = checks['velo_'+s.veloDir] ? 'checked' : '';
@@ -787,24 +799,16 @@ function renderDayPanel(day) {
         </div>`;
       } else if (s.exercises) {
         const allDone = s.exercises.every(ex => checks[ex.id]);
-        html += `<div class="session-card">
-          <div class="session-head">
-            <div class="session-emoji">${s.emoji}</div>
-            <div class="session-info">
-              <div class="session-title">${s.title}</div>
-              <div class="session-meta">${s.desc}</div>
-            </div>
-            <div>
-              <div class="session-duration">${s.duration}</div>
-              <span class="session-done-badge ${allDone?'visible':''}">✓ Terminé</span>
-            </div>
-          </div>
-          ${s.note ? `<div class="note-banner">💡 ${s.note}</div>` : ''}
-          <div class="ex-list">
-            ${s.exercises.map((ex,i) => {
-              const checked = checks[ex.id] ? 'checked' : '';
-              return `<div class="ex-row ${checked}" id="exrow_${day.id}_${ex.id}" onclick="toggleEx('${day.id}','${ex.id}','${s.id}',this)">
-                <div class="ex-check">${checked?'✓':''}</div>
+        const sessionCollapsed = allDone || firstOpenSessionFound;
+        if (!allDone && !firstOpenSessionFound) firstOpenSessionFound = true;
+
+        let firstOpenExFound = false;
+        const exListHtml = s.exercises.map((ex,i) => {
+          const checked = checks[ex.id] ? 'checked' : '';
+          const exCollapsed = !!checked || firstOpenExFound;
+          if (!checked && !firstOpenExFound) firstOpenExFound = true;
+          return `<div class="ex-item${exCollapsed?' collapsed':''}" id="exitem_${day.id}_${ex.id}"><div class="ex-row ${checked}" id="exrow_${day.id}_${ex.id}" onclick="toggleExCollapse(event,'${day.id}','${ex.id}')">
+                <button type="button" class="ex-check" onclick="event.stopPropagation();toggleEx('${day.id}','${ex.id}','${s.id}')">${checked?'✓':''}</button>
                 <div class="ex-body">
                   <div class="ex-name">${i+1}. ${ex.name}</div>
                   <div class="ex-desc">${ex.desc}</div>
@@ -814,10 +818,26 @@ function renderDayPanel(day) {
                   ${ex.charge ? `<span class="charge-tag">${ex.charge}</span>` : ''}
                   <div class="type-dot dot-${ex.type}"></div>
                 </div>
+                <button class="ex-toggle">▾</button>
               </div>
-              ${ex.subExos ? renderSubExoTracker(day.id, ex) : isDurationEx(ex) ? renderSeriesTracker(day.id, ex) : renderRepTracker(day.id, ex)}`;
-            }).join('')}
+              ${ex.subExos ? renderSubExoTracker(day.id, ex) : isDurationEx(ex) ? renderSeriesTracker(day.id, ex) : renderRepTracker(day.id, ex)}</div>`;
+        }).join('');
+
+        html += `<div class="session-card${sessionCollapsed?' collapsed':''}" data-sid="${s.id}">
+          <div class="session-head" onclick="toggleSession(event,'${day.id}','${s.id}')">
+            <div class="session-emoji">${s.emoji}</div>
+            <div class="session-info">
+              <div class="session-title">${s.title}</div>
+              <div class="session-meta">${s.desc}</div>
+            </div>
+            <div>
+              <div class="session-duration">${s.duration}</div>
+              <span class="session-done-badge ${allDone?'visible':''}">✓ Terminé</span>
+            </div>
+            <button class="session-toggle" onclick="toggleSession(event,'${day.id}','${s.id}')">▾</button>
           </div>
+          ${s.note ? `<div class="note-banner">💡 ${s.note}</div>` : ''}
+          <div class="ex-list">${exListHtml}</div>
         </div>`;
       }
     });
@@ -856,10 +876,12 @@ function renderDayPanel(day) {
 
 function bindDayEvents(dayId, panel) { /* events are inline for simplicity */ }
 
-function toggleEx(dayId, exId, sessionId, row) {
+function toggleEx(dayId, exId, sessionId) {
   const { checks } = loadData(dayId);
   checks[exId] = !checks[exId];
   saveChecks(dayId, checks);
+  const row = document.getElementById('exrow_' + dayId + '_' + exId);
+  if (!row) return;
   row.classList.toggle('checked', checks[exId]);
   row.querySelector('.ex-check').textContent = checks[exId]?'✓':'';
   // Update session done badge
@@ -1251,6 +1273,25 @@ function renderSubExoTracker(dayId, ex) {
   html += `</div>`;
   return html;
 }
+
+// ╔══════════════════════════════════════════════╗
+// ║  REPLI — Sessions & Exercices                ║
+// ╚══════════════════════════════════════════════╝
+
+function toggleSession(event, dayId, sessionId) {
+  event.stopPropagation();
+  const panel = document.getElementById('panel_' + dayId);
+  if (!panel) return;
+  const card = panel.querySelector(`.session-card[data-sid="${sessionId}"]`);
+  if (card) card.classList.toggle('collapsed');
+}
+
+function toggleExCollapse(event, dayId, exId) {
+  event.stopPropagation();
+  const item = document.getElementById('exitem_' + dayId + '_' + exId);
+  if (item) item.classList.toggle('collapsed');
+}
+
 
 // ╔══════════════════════════════════════════════╗
 // ║  WEEK NAV — Navigation semaine               ║
