@@ -4,11 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Programme Semaine — Dos & Forme</title>
+<!-- ═══ STYLES ═══ -->
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@300;400;500;600&display=swap');
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
+/* ── Variables globales (couleurs, espacements) ── */
 :root{
   --bg:#F4F2ED;
   --surface:#FFFFFF;
@@ -161,7 +163,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .eq-tag{background:white;border:1px solid rgba(74,79,168,.2);border-radius:20px;padding:4px 12px;font-size:11px;color:var(--weekend)}
 
 
-/* DRIVE SYNC */
+/* ── Drive sync bar ── */
 .sync-bar{display:flex;align-items:center;gap:10px;padding:.6rem 1.25rem;background:var(--surface);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)}
 .sync-status{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
 .sync-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--muted2)}
@@ -176,7 +178,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .sync-btn.primary:hover{opacity:.85}
 
 
-/* SERIES TRACKER */
+/* ── Series tracker (timers & reps) ── */
 .series-tracker{padding:.5rem 1.25rem .75rem;border-top:1px solid var(--border);background:var(--surface)}
 .series-row{display:flex;align-items:center;gap:8px;padding:.4rem 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
 .series-row:last-child{border-bottom:none}
@@ -204,7 +206,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 </head>
 <body>
 
-<!-- TOP BAR -->
+<!-- ── Topbar : titre + navigation semaine ── -->
 <div class="topbar">
   <div>
     <div class="topbar-title">Programme Semaine</div>
@@ -217,7 +219,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </div>
 </div>
 
-<!-- SYNC BAR -->
+<!-- ── Barre de sync Google Drive ── -->
 <div class="sync-bar" id="sync-bar">
   <div class="sync-status">
     <div class="sync-dot" id="sync-dot"></div>
@@ -226,19 +228,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   <button class="sync-btn primary" id="sync-btn" onclick="handleSyncBtn()">Connecter Drive</button>
 </div>
 
-<!-- OVERVIEW RINGS -->
+<!-- ── Vue d'ensemble : rings de progression hebdo ── -->
 <div class="overview-bar" id="overview-bar"></div>
 
-<!-- DAY TABS -->
+<!-- ── Onglets jours (générés par renderTabs) ── -->
 <div class="day-tabs" id="day-tabs"></div>
 
-<!-- PANELS -->
+<!-- ── Panneaux jour (générés par renderAllPanels) ── -->
 <div class="day-panels" id="day-panels"></div>
 
 <script>
-// ═══════════════════════════════════════════════
-//  DATA
-// ═══════════════════════════════════════════════
+// ╔══════════════════════════════════════════════╗
+// ║  DATA — Constantes & définitions sessions    ║
+// ╚══════════════════════════════════════════════╝
+// Structure : DAYS, TYPE_LABELS, SESSIONS { bureau, tele, weekend }
+// Voir CLAUDE.md §"Structure des données SESSIONS" pour le schéma complet
 
 const DAYS = [
   { id:'lun', label:'Lun', fullName:'Lundi', type:'bureau' },
@@ -255,6 +259,8 @@ const TYPE_COLORS = { bureau:'bureau', tele:'tele', weekend:'weekend' };
 
 // Séances selon type de jour
 const SESSIONS = {
+
+  // ── Sessions bureau (Lun / Mer / Ven) ──
   bureau: [
     {
       id:'matin_bureau', emoji:'🌅', title:'Matin — Activation lombaire',
@@ -290,6 +296,7 @@ const SESSIONS = {
       ]
     },
   ],
+  // ── Sessions télétravail (Mar / Jeu) ──
   tele: [
     {
       id:'matin_tele', emoji:'🌅', title:'Matin — Activation & gainage profond',
@@ -329,7 +336,10 @@ const SESSIONS = {
       ]
     },
   ],
+  // ── Sessions week-end ──
   weekend: {
+
+    // ── Samedi ──
     sam: [
       {
         id:'echauffement_sam', emoji:'🔥', title:'Échauffement général',
@@ -381,6 +391,7 @@ const SESSIONS = {
         ]
       },
     ],
+    // ── Dimanche ──
     dim: [
       {
         id:'yoga_dim', emoji:'🧘', title:'Yoga doux — Récupération active',
@@ -407,9 +418,10 @@ const SESSIONS = {
   },
 };
 
-// ═══════════════════════════════════════════════
-//  STATE
-// ═══════════════════════════════════════════════
+// ╔══════════════════════════════════════════════╗
+// ║  STATE — Variables globales & helpers date   ║
+// ╚══════════════════════════════════════════════╝
+// currentWeekOffset, activeDay, timers, serieTimers, driveState
 let currentWeekOffset = 0;
 let activeDay = 'lun';
 const timers = {};
@@ -439,10 +451,14 @@ function getWeekNumber(d) {
   return Math.ceil((((d-onejan)/86400000)+onejan.getDay()+1)/7);
 }
 
-// ═══════════════════════════════════════════════
-//  GOOGLE DRIVE SYNC
-// ═══════════════════════════════════════════════
+// ╔══════════════════════════════════════════════╗
+// ║  GOOGLE DRIVE — OAuth2 & persistance         ║
+// ╚══════════════════════════════════════════════╝
+// Flux : initGoogleAuth → tryRestoreToken → loadFromDrive
+// Fallback localStorage si non connecté
+// Fichier Drive : fitness_programme_semaine.json  Scope : drive.file
 
+// ── Config & état Drive ──
 // ⚙️ REMPLACE PAR TON CLIENT ID GOOGLE CLOUD
 const GOOGLE_CLIENT_ID = '32795966086-3kt7ddob947h1bsahsmfom1qlmtkucea.apps.googleusercontent.com';
 const DRIVE_FILENAME = 'fitness_programme_semaine.json';
@@ -453,6 +469,7 @@ let driveState = {
   syncing: false, data: {}, saveTimer: null
 };
 
+// ── UI Sync ──
 function setSyncUI(state, label) {
   const dot = document.getElementById('sync-dot');
   const lbl = document.getElementById('sync-label');
@@ -470,6 +487,7 @@ function handleSyncBtn() {
   else initGoogleAuth();
 }
 
+// ── Auth Google ──
 function initGoogleAuth() {
   if (!window.google || !GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith('VOTRE')) {
     alert('⚙️ Configure ton Client ID Google dans le fichier HTML.\nConsulte le guide de configuration fourni.');
@@ -507,6 +525,7 @@ function tryRestoreToken() {
   } catch(e) {}
 }
 
+// ── Requêtes Drive (find / load / save) ──
 async function driveReq(method, url, bodyObj) {
   const headers = { Authorization: 'Bearer ' + driveState.accessToken };
   if (bodyObj) headers['Content-Type'] = 'application/json';
@@ -569,6 +588,7 @@ async function saveToDrive() {
   } catch(e) { setSyncUI('error', 'Erreur sauvegarde Drive'); console.error(e); }
 }
 
+// ── Planification de sauvegarde & storage API ──
 function scheduleSave() {
   if (driveState.saveTimer) clearTimeout(driveState.saveTimer);
   driveState.saveTimer = setTimeout(() => { if (driveState.connected) saveToDrive(); }, 2000);
@@ -618,10 +638,13 @@ function saveJournal(dayId, journal) {
   if (driveState.connected) { driveState.data[k] = journal; scheduleSave(); }
 }
 
-// ═══════════════════════════════════════════════
-//  RENDER
-// ═══════════════════════════════════════════════
+// ╔══════════════════════════════════════════════╗
+// ║  RENDER — Génération du DOM                  ║
+// ╚══════════════════════════════════════════════╝
+// getSessionsForDay, countExercises, renderOverview,
+// renderTabs, switchDay, renderAllPanels, renderDayPanel
 
+// ── Helpers & utilitaires de rendu ──
 function getSessionsForDay(dayId) {
   const day = DAYS.find(d=>d.id===dayId);
   if (day.type === 'weekend') {
@@ -708,6 +731,7 @@ function renderAllPanels() {
   });
 }
 
+// ── renderDayPanel : panneau complet d'un jour (sessions + journal) ──
 function renderDayPanel(day) {
   const sessions = getSessionsForDay(day.id);
   const { checks, journal } = loadData(day.id);
@@ -825,9 +849,10 @@ function renderDayPanel(day) {
   return html;
 }
 
-// ═══════════════════════════════════════════════
-//  INTERACTIONS
-// ═══════════════════════════════════════════════
+// ╔══════════════════════════════════════════════╗
+// ║  INTERACTIONS — Handlers utilisateur         ║
+// ╚══════════════════════════════════════════════╝
+// toggleEx, toggleVelo, setStar, setFeeling, saveJournalEntry
 
 function bindDayEvents(dayId, panel) { /* events are inline for simplicity */ }
 
@@ -912,9 +937,14 @@ function saveJournalEntry(dayId) {
   if (conf) { conf.classList.add('show'); setTimeout(()=>conf.classList.remove('show'),2000); }
 }
 
-// ═══════════════════════════════════════════════
-//  TIMERS & SERIES TRACKER
-// ═══════════════════════════════════════════════
+// ╔══════════════════════════════════════════════╗
+// ║  TIMERS & SERIES TRACKER                     ║
+// ╚══════════════════════════════════════════════╝
+// isDurationEx  → détecte durée vs reps
+// renderSeriesTracker → durée simple ou /côté
+// renderRepTracker    → reps simple ou /côté
+// renderSubExoTracker → subExos (ex: Sphinx→Enfant)
+// startSerieTimer     → Web Audio + countdown
 
 function fmtTime(s) {
   return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
@@ -1222,9 +1252,9 @@ function renderSubExoTracker(dayId, ex) {
   return html;
 }
 
-// ═══════════════════════════════════════════════
-//  WEEK NAV
-// ═══════════════════════════════════════════════
+// ╔══════════════════════════════════════════════╗
+// ║  WEEK NAV — Navigation semaine               ║
+// ╚══════════════════════════════════════════════╝
 
 function changeWeek(delta) {
   currentWeekOffset += delta;
@@ -1241,9 +1271,10 @@ function updateWeekDisplay() {
   document.getElementById('week-range-label').textContent = label;
 }
 
-// ═══════════════════════════════════════════════
-//  INIT — auto-select today
-// ═══════════════════════════════════════════════
+// ╔══════════════════════════════════════════════╗
+// ║  INIT — Point d'entrée                       ║
+// ╚══════════════════════════════════════════════╝
+// Détecte le jour courant, charge les données, rend l'UI
 
 (function init() {
   const jsDay = new Date().getDay(); // 0=dim, 1=lun...
