@@ -376,7 +376,7 @@ const SESSIONS = {
           {id:'s_p2', name:'Étirement pectoraux (angle mur)', desc:'Avant-bras contre un encadrement de porte, penche doucement le thorax vers l\'avant. Ouverture pectorale post-développé.', reps:'2 × 40 s /côté', sec:160, type:'etirement'},
           {id:'s_p3', name:'Étirement grand dorsal (bras overhead)', desc:'Debout, jambes écartées, agrippe un encadrement ou un mur en hauteur, laisse le poids du corps étirer le côté. Post-rowing.', reps:'2 × 40 s /côté', sec:160, type:'etirement'},
           {id:'s_p4', name:'Étirement trapèzes (inclinaison latérale tête)', desc:'Assis, penche la tête vers l\'épaule, aide doucement avec la main. Relâche les trapèzes chargés pendant les shrugs.', reps:'2 × 30 s /côté', sec:120, type:'etirement'},
-          {id:'s_p5', name:'Sphinx + enfant (Child\'s pose)', desc:'Sphinx 30 s pour ouvrir les lombaires, puis position de l\'enfant 40 s. Décompression complète de la colonne post-effort.', reps:'2 × 70 s', sec:280, type:'etirement'},
+          {id:'s_p5', name:'Sphinx → Enfant (alternés)', desc:'Alterne sphinx 30 s (extension lombaire) et position de l\'enfant 40 s (flexion décompressive). Contre les heures en flexion post-effort.', reps:'2 × cycle', sec:140, type:'etirement', sets:2, subExos:[{name:'Sphinx',sec:30},{name:'Enfant',sec:40}]},
           {id:'s_p6', name:'Torsion spinale allongée', desc:'Allongé, genou croisé de l\'autre côté, bras en T. Relâchement final des lombaires et de la chaîne latérale.', reps:'2 × 45 s /côté', sec:180, type:'etirement'},
         ]
       },
@@ -791,7 +791,7 @@ function renderDayPanel(day) {
                   <div class="type-dot dot-${ex.type}"></div>
                 </div>
               </div>
-              ${isDurationEx(ex) ? renderSeriesTracker(day.id, ex) : renderRepTracker(day.id, ex)}`;
+              ${ex.subExos ? renderSubExoTracker(day.id, ex) : isDurationEx(ex) ? renderSeriesTracker(day.id, ex) : renderRepTracker(day.id, ex)}`;
             }).join('')}
           </div>
         </div>`;
@@ -1197,6 +1197,30 @@ function toggleSerieCheck(sid) {
 
 // ── Fallback timer (unused but kept for safety) ──
 function toggleTimer(id, total) {}
+
+// ── Render alternating sub-exercise tracker ──
+function renderSubExoTracker(dayId, ex) {
+  const sets = ex.sets || 1;
+  const subs = ex.subExos || [];
+  let html = `<div class="series-tracker" id="st_${dayId}_${ex.id}">`;
+  for (let i = 0; i < sets; i++) {
+    subs.forEach((sub, j) => {
+      const sid = `${dayId}_${ex.id}_s${i}_sub${j}`;
+      const isLast = (i === sets-1 && j === subs.length-1);
+      const restSec = (j === subs.length-1) ? 15 : 0; // rest only after full cycle
+      html += `<div class="series-row" id="srow_${sid}">
+        <div class="serie-check" id="schk_${sid}" onclick="toggleSerieCheck('${sid}')"></div>
+        <span class="serie-label">${sub.name} ${i+1}/${sets}</span>
+        <button class="serie-timer-btn" id="stbtn_${sid}" onclick="startSerieTimer('${sid}',${sub.sec},${restSec},${i*subs.length+j},${sets*subs.length})">
+          ▶ <span id="stdisp_${sid}">${fmtTime(sub.sec)}</span>
+        </button>
+        <span class="serie-phase" id="sphase_${sid}"></span>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+  return html;
+}
 
 // ═══════════════════════════════════════════════
 //  WEEK NAV

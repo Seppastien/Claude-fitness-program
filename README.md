@@ -20,6 +20,7 @@ Application web autonome (fichier HTML unique) pour suivre un programme fitness 
 - **Exercices latéraux** (`/côté`) : lignes séparées Gauche / Droite avec timer individuel par côté — le repos ne se déclenche qu'après le second côté
 - **Exercices alternés continus** (crunch bicycle, superman, planche tap) : séries simples sans séparation gauche/droite — serieInfo indique le total de cycles
 - **Exercices alternés avec pause** (Bird Dog, Dead Bug) : séries simples, alternance fluide gauche/droite au sein de chaque série — serieInfo précise le nombre de reps par côté
+- **Exercices combinés** (Sphinx → Enfant) : postures alternées au sein d'un même exercice, chacune avec son propre timer — mécanisme `subExos` réutilisable
 - Description de chaque série (reps, poids, tempo) affichée **une seule fois** en haut du bloc de séries
 - Navigation par semaine avec historique complet
 
