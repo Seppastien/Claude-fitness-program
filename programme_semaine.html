@@ -1231,14 +1231,34 @@ function startSerieTimer(sid, secPerSet, restSec, serieIdx, totalSets) {
         if (chk && !chk.classList.contains('done')) {
           chk.classList.add('done'); chk.textContent = '✓';
         }
-        // Passer en phase repos
-        st.phase = 'rest';
-        st.remaining = restSec;
-        btn.classList.remove('running');
-        btn.classList.add('rest');
-        const pb = document.getElementById('stbtn_'+sid);
-        if (pb) pb.innerHTML = `⏸ <span id="stdisp_${sid}">${fmtTime(restSec)}</span>`;
-        if (phase) { phase.textContent = 'Repos…'; phase.className = 'serie-phase'; }
+        if (serieIdx === totalSets - 1) {
+          // Dernière série — valider l'exercice et ouvrir le suivant
+          clearInterval(st.interval);
+          serieTimers[sid] = null;
+          btn.classList.remove('running');
+          if (phase) { phase.textContent = 'Terminé !'; phase.className = 'serie-phase active-phase'; }
+          if (chk) syncExValidation(chk);
+          const tracker = btn.closest('.series-tracker');
+          if (tracker) {
+            const exItem = tracker.closest('.ex-item');
+            if (exItem) {
+              setTimeout(() => {
+                exItem.classList.add('collapsed');
+                const next = exItem.nextElementSibling;
+                if (next && next.classList.contains('ex-item')) next.classList.remove('collapsed');
+              }, 800);
+            }
+          }
+        } else {
+          // Passer en phase repos
+          st.phase = 'rest';
+          st.remaining = restSec;
+          btn.classList.remove('running');
+          btn.classList.add('rest');
+          const pb = document.getElementById('stbtn_'+sid);
+          if (pb) pb.innerHTML = `⏸ <span id="stdisp_${sid}">${fmtTime(restSec)}</span>`;
+          if (phase) { phase.textContent = 'Repos…'; phase.className = 'serie-phase'; }
+        }
       }
     } else if (st.phase === 'rest') {
       st.remaining--;
@@ -1256,6 +1276,17 @@ function startSerieTimer(sid, secPerSet, restSec, serieIdx, totalSets) {
           pb.innerHTML = `✓ <span id="stdisp_${sid}">0:00</span>`;
         }
         if (phase) { phase.textContent = 'Série suivante !'; phase.className = 'serie-phase active-phase'; }
+        // Auto-démarrer la série suivante
+        if (serieIdx + 1 < totalSets) {
+          const currentBtn = document.getElementById('stbtn_'+sid);
+          if (currentBtn) {
+            const tracker = currentBtn.closest('.series-tracker');
+            if (tracker) {
+              const allBtns = tracker.querySelectorAll('.serie-timer-btn');
+              if (allBtns[serieIdx + 1]) allBtns[serieIdx + 1].click();
+            }
+          }
+        }
       }
     }
   }, 1000);
