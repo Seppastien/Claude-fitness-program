@@ -787,8 +787,14 @@ function renderDayPanel(day) {
   if (!sessions) {
     html += `<div class="soon-card"><div class="soon-icon">🗓️</div><div class="soon-title">Aucune séance prévue</div></div>`;
   } else {
-    let firstOpenSessionFound = false;
-    sessions.forEach(s => {
+    const lastDoneIdx = sessions.reduce((found, s, idx) => {
+      if (s.exercises && s.exercises.every(ex => checks[ex.id])) return idx;
+      return found;
+    }, -1);
+    const targetOpenIdx = sessions.findIndex((s, idx) =>
+      idx > lastDoneIdx && s.exercises && !s.exercises.every(ex => checks[ex.id])
+    );
+    sessions.forEach((s, sIdx) => {
       if (s.isVelo) {
         const isChecked = checks['velo_'+s.veloDir] ? 'checked' : '';
         html += `<div class="velo-card">
@@ -810,8 +816,7 @@ function renderDayPanel(day) {
         </div>`;
       } else if (s.exercises) {
         const allDone = s.exercises.every(ex => checks[ex.id]);
-        const sessionCollapsed = allDone || firstOpenSessionFound;
-        if (!allDone && !firstOpenSessionFound) firstOpenSessionFound = true;
+        const sessionCollapsed = allDone || sIdx !== targetOpenIdx;
 
         let firstOpenExFound = false;
         const exListHtml = s.exercises.map((ex,i) => {
