@@ -452,8 +452,10 @@ const DEFAULT_CONFIG = {
 const CONFIG_STORAGE_KEY = 'fitness_config';
 
 function cloneDefaultConfig() {
+  const now = new Date().toISOString();
   return {
     version: DEFAULT_CONFIG.version,
+    meta: { createdAt: now, lastModified: now, source: 'default' },
     days: JSON.parse(JSON.stringify(DEFAULT_CONFIG.days)),
     typeLabels: JSON.parse(JSON.stringify(DEFAULT_CONFIG.typeLabels)),
     typeColors: JSON.parse(JSON.stringify(DEFAULT_CONFIG.typeColors)),
@@ -527,19 +529,24 @@ function getWeekNumber(d) {
 // ╔══════════════════════════════════════════════╗
 // ║  GOOGLE DRIVE — OAuth2 & persistance         ║
 // ╚══════════════════════════════════════════════╝
-// Flux : initGoogleAuth → tryRestoreToken → loadFromDrive
+// Flux : initGoogleAuth → tryRestoreToken → loadFromDrive (progress + config)
 // Fallback localStorage si non connecté
-// Fichier Drive : fitness_programme_semaine.json  Scope : drive.file
+// Deux fichiers Drive :
+//   fitness_programme_semaine.json → progression (checks, journal) — volatile
+//   fitness_programme_config.json  → config utilisateur (days, sessions)  — rare
+// Scope : drive.file
 
 // ── Config & état Drive ──
 // ⚙️ REMPLACE PAR TON CLIENT ID GOOGLE CLOUD
 const GOOGLE_CLIENT_ID = '32795966086-3kt7ddob947h1bsahsmfom1qlmtkucea.apps.googleusercontent.com';
 const DRIVE_FILENAME = 'fitness_programme_semaine.json';
+const DRIVE_CONFIG_FILENAME = 'fitness_programme_config.json';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 
 let driveState = {
-  connected: false, accessToken: null, fileId: null,
-  syncing: false, data: {}, saveTimer: null
+  connected: false, accessToken: null,
+  fileId: null, configFileId: null,
+  syncing: false, data: {}, saveTimer: null, configSaveTimer: null
 };
 
 // ── UI Sync ──
@@ -607,17 +614,29 @@ async function driveReq(method, url, bodyObj) {
   return res;
 }
 
-async function findDriveFile() {
+async function findDriveFileByName(name) {
   const res = await driveReq('GET',
-    `https://www.googleapis.com/drive/v3/files?q=name='${DRIVE_FILENAME}'+and+trashed=false&fields=files(id)`
+    `https://www.googleapis.com/drive/v3/files?q=name='${name}'+and+trashed=false&fields=files(id)`
   );
   if (!res) return null;
   const d = await res.json();
   return d.files && d.files.length > 0 ? d.files[0].id : null;
 }
 
+async function findDriveFile() {
+  return findDriveFileByName(DRIVE_FILENAME);
+}
+
+async function findConfigDriveFile() {
+  return findDriveFileByName(DRIVE_CONFIG_FILENAME);
+}
+
 async function loadFromDrive() {
   try {
+    // 1) Config utilisateur : Drive prime sur localStorage/défauts.
+    await loadConfigFromDrive();
+
+    // 2) Progression (checks, journal).
     const fileId = await findDriveFile();
     if (fileId) {
       driveState.fileId = fileId;
@@ -633,6 +652,26 @@ async function loadFromDrive() {
     }
     renderAllPanels(); renderTabs(); renderOverview();
   } catch(e) { setSyncUI('error', 'Erreur chargement Drive'); console.error(e); }
+}
+
+async function loadConfigFromDrive() {
+  try {
+    const fileId = await findConfigDriveFile();
+    if (!fileId) {
+      // Premier démarrage Drive : on pousse la config locale/défaut comme seed.
+      await saveConfigToDrive();
+      return;
+    }
+    driveState.configFileId = fileId;
+    const res = await driveReq('GET', `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+    if (!res) return;
+    const remote = await res.json();
+    if (isValidConfig(remote)) {
+      LIVE_CONFIG = remote;
+      // Miroir localStorage pour un redémarrage offline cohérent.
+      try { localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(remote)); } catch {}
+    }
+  } catch(e) { console.error('loadConfigFromDrive', e); }
 }
 
 async function saveToDrive() {
@@ -661,11 +700,52 @@ async function saveToDrive() {
   } catch(e) { setSyncUI('error', 'Erreur sauvegarde Drive'); console.error(e); }
 }
 
+async function saveConfigToDrive() {
+  if (!driveState.connected || !driveState.accessToken) return;
+  try {
+    const blob = new Blob([JSON.stringify(LIVE_CONFIG)], {type:'application/json'});
+    const form = new FormData();
+    const meta = {name: DRIVE_CONFIG_FILENAME, mimeType: 'application/json'};
+    form.append('metadata', new Blob([JSON.stringify(meta)], {type:'application/json'}));
+    form.append('file', blob);
+    if (driveState.configFileId) {
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveState.configFileId}?uploadType=multipart`, {
+        method: 'PATCH', headers: {Authorization:'Bearer '+driveState.accessToken}, body: form
+      });
+    } else {
+      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST', headers: {Authorization:'Bearer '+driveState.accessToken}, body: form
+      });
+      const created = await res.json();
+      driveState.configFileId = created.id;
+    }
+  } catch(e) { console.error('saveConfigToDrive', e); }
+}
+
 // ── Planification de sauvegarde & storage API ──
 // Debounce 2 s : regroupe les sauvegardes multiples (ex: cocher 3 séries d'affilée → 1 seul appel Drive)
 function scheduleSave() {
   if (driveState.saveTimer) clearTimeout(driveState.saveTimer);
   driveState.saveTimer = setTimeout(() => { if (driveState.connected) saveToDrive(); }, 2000);
+}
+
+// Debounce dédié à la config : évite qu'une édition admin rapide génère plusieurs uploads.
+function scheduleSaveConfig() {
+  if (driveState.configSaveTimer) clearTimeout(driveState.configSaveTimer);
+  driveState.configSaveTimer = setTimeout(() => { if (driveState.connected) saveConfigToDrive(); }, 2000);
+}
+
+// API publique : persiste la config dans LIVE_CONFIG + localStorage, et schedule Drive si connecté.
+// L'admin UI (tranches 3/4) appellera cette fonction après chaque édition.
+function saveConfig(newConfig) {
+  if (!isValidConfig(newConfig)) { console.warn('saveConfig: config invalide, ignorée'); return false; }
+  newConfig.meta = newConfig.meta || {};
+  newConfig.meta.lastModified = new Date().toISOString();
+  newConfig.meta.source = 'user';
+  LIVE_CONFIG = newConfig;
+  try { localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(newConfig)); } catch(e) { console.error(e); }
+  if (driveState.connected) scheduleSaveConfig();
+  return true;
 }
 
 function getAllLocalData() {
