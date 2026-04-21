@@ -257,6 +257,24 @@ body:not(.admin-mode) .admin-container{display:none}
 .admin-btn.danger:hover{background:#FBEDED}
 .admin-btn-icon{padding:4px 10px;font-size:13px;line-height:1}
 .admin-hint{font-size:11px;color:var(--muted);font-style:italic;margin-top:6px}
+.admin-banner-actions{display:flex;gap:6px;flex-wrap:wrap}
+/* Reps builder */
+.admin-builder{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px}
+.admin-builder-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.admin-builder-title{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:500}
+.admin-builder-modes{display:flex;gap:14px;margin-bottom:10px;font-size:13px}
+.admin-builder-modes label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;color:var(--text);text-transform:none;letter-spacing:0;margin:0}
+.admin-builder-preview{margin-top:8px;padding:8px 10px;background:#fff;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}
+.admin-builder-preview code{background:var(--surface2);padding:2px 6px;border-radius:3px;font-family:'DM Mono',monospace;color:var(--text);font-size:11px}
+.admin-builder-toggle{font-size:11px;color:var(--bureau);cursor:pointer;background:none;border:none;padding:0;text-decoration:underline}
+/* SubExos */
+.admin-subexos{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:12px}
+.admin-subexo-row{display:grid;grid-template-columns:1fr 70px auto;gap:6px;align-items:center;margin-bottom:6px}
+.admin-subexo-row input{padding:5px 8px;font-size:12px;border:1px solid var(--border2);border-radius:4px;background:#fff;font-family:inherit}
+.admin-subexo-row .admin-btn-icon{padding:3px 7px;font-size:11px}
+.admin-subexo-actions{display:flex;gap:3px}
+/* Velo stats */
+.admin-velo{background:var(--velo-bg);border:1px solid rgba(184,137,10,0.3);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px}
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -297,8 +315,14 @@ body:not(.admin-mode) .admin-container{display:none}
 <!-- ── Mode admin : éditeur de configuration (caché par défaut) ── -->
 <div class="admin-container" id="admin-container">
   <div class="admin-banner">
-    <span>⚠️ Mode édition — toute modification est sauvegardée automatiquement</span>
-    <button class="admin-action-btn" onclick="toggleAdminMode()">Quitter le mode édition</button>
+    <span>⚠️ Mode édition — modifications sauvegardées automatiquement</span>
+    <div class="admin-banner-actions">
+      <button class="admin-action-btn" onclick="adminExportConfig()" title="Télécharger la config actuelle">⇩ Export</button>
+      <button class="admin-action-btn" onclick="document.getElementById('admin-import-input').click()" title="Charger une config depuis un fichier">⇧ Import</button>
+      <input type="file" id="admin-import-input" accept="application/json,.json" style="display:none" onchange="adminImportConfig(event)">
+      <button class="admin-action-btn" onclick="adminResetConfig()" title="Restaurer les sessions par défaut">↻ Reset</button>
+      <button class="admin-action-btn" onclick="toggleAdminMode()">Quitter</button>
+    </div>
   </div>
   <div class="admin-layout">
     <div class="admin-tree" id="admin-tree"></div>
@@ -795,11 +819,11 @@ function scheduleSaveConfig() {
 
 // API publique : persiste la config dans LIVE_CONFIG + localStorage, et schedule Drive si connecté.
 // L'admin UI (tranches 3/4) appellera cette fonction après chaque édition.
-function saveConfig(newConfig) {
+function saveConfig(newConfig, source) {
   if (!isValidConfig(newConfig)) { console.warn('saveConfig: config invalide, ignorée'); return false; }
   newConfig.meta = newConfig.meta || {};
   newConfig.meta.lastModified = new Date().toISOString();
-  newConfig.meta.source = 'user';
+  newConfig.meta.source = source || 'user';
   LIVE_CONFIG = newConfig;
   try { localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(newConfig)); } catch(e) { console.error(e); }
   if (driveState.connected) scheduleSaveConfig();
@@ -1793,6 +1817,7 @@ function bindAdminTreeEvents() {
 
 function adminSelect(kind, dayId, sessionId, exerciseId) {
   adminState.selected = { kind, dayId, sessionId, exerciseId };
+  adminState.repsFreeMode = false; // reset à chaque navigation
   if (kind === 'session' || kind === 'exercise') adminState.expanded.add(dayId);
   if (kind === 'exercise') adminState.expanded.add(adminKey(dayId, sessionId));
   renderAdminTree();
@@ -1853,8 +1878,8 @@ function renderSessionEditor(dayId, sessionId) {
         <label><input type="checkbox" data-field="isMuscu" ${s.isMuscu?'checked':''}> Muscu</label>
         <label><input type="checkbox" data-field="isYoga" ${s.isYoga?'checked':''}> Yoga</label>
       </div>
-      <div class="admin-hint">veloStats/veloDir éditables en tranche 4.</div>
     </div>
+    ${s.isVelo ? renderVeloStatsEditor(s) : ''}
     <div class="admin-actions">
       <button class="admin-btn admin-btn-icon" onclick="adminMoveSession('${dayId}','${sessionId}',-1)" title="Monter">↑</button>
       <button class="admin-btn admin-btn-icon" onclick="adminMoveSession('${dayId}','${sessionId}',1)" title="Descendre">↓</button>
@@ -1864,17 +1889,39 @@ function renderSessionEditor(dayId, sessionId) {
   `;
 }
 
+function renderVeloStatsEditor(s) {
+  const vs = s.veloStats || {};
+  return `
+    <div class="admin-velo">
+      <div class="admin-builder-title" style="margin-bottom:8px">🚴 Paramètres vélo</div>
+      <div class="admin-field-row">
+        <div class="admin-field">
+          <label>Direction</label>
+          <select data-field="veloDir">
+            <option value="aller"${s.veloDir==='aller'?' selected':''}>Aller</option>
+            <option value="retour"${s.veloDir==='retour'?' selected':''}>Retour</option>
+          </select>
+        </div>
+        <div class="admin-field"><label>Distance (km)</label><input type="text" data-field="veloStats.km" value="${adminEscapeAttr(vs.km||'')}"></div>
+      </div>
+      <div class="admin-field-row">
+        <div class="admin-field"><label>Durée</label><input type="text" data-field="veloStats.duree" value="${adminEscapeAttr(vs.duree||'')}"></div>
+        <div class="admin-field"><label>Calories</label><input type="text" data-field="veloStats.cal" value="${adminEscapeAttr(vs.cal||'')}"></div>
+      </div>
+      <div class="admin-field"><label>Difficulté</label><input type="text" data-field="veloStats.difficulte" value="${adminEscapeAttr(vs.difficulte||'')}"></div>
+    </div>
+  `;
+}
+
 function renderExerciseEditor(dayId, sessionId, exerciseId) {
   const ex = adminFindExercise(dayId, sessionId, exerciseId);
   if (!ex) return '<div class="admin-empty">Exercice introuvable.</div>';
+  const hasSubExos = Array.isArray(ex.subExos) && ex.subExos.length > 0;
   return `
     <h3>Exercice : ${adminEscapeHTML(ex.name || '(sans nom)')}</h3>
     <div class="admin-field"><label>Nom</label><input type="text" data-field="name" value="${adminEscapeAttr(ex.name||'')}"></div>
     <div class="admin-field"><label>Description</label><textarea data-field="desc">${adminEscapeHTML(ex.desc||'')}</textarea></div>
-    <div class="admin-field-row">
-      <div class="admin-field"><label>Reps (ex : 3 × 12, 3 × 40 s /côté)</label><input type="text" data-field="reps" value="${adminEscapeAttr(ex.reps||'')}"></div>
-      <div class="admin-field"><label>Durée totale (sec)</label><input type="text" data-field="sec" value="${ex.sec||0}"></div>
-    </div>
+    ${hasSubExos ? renderSubExosEditor(ex) : renderRepsBuilder(ex)}
     <div class="admin-field-row">
       <div class="admin-field">
         <label>Type</label>
@@ -1890,7 +1937,12 @@ function renderExerciseEditor(dayId, sessionId, exerciseId) {
     </div>
     <div class="admin-field"><label>Info série (serieInfo)</label><input type="text" data-field="serieInfo" value="${adminEscapeAttr(ex.serieInfo||'')}"></div>
     <div class="admin-field"><label>Lien fiche technique (url)</label><input type="text" data-field="url" value="${adminEscapeAttr(ex.url||'')}"></div>
-    <div class="admin-hint">Éditeur de séries intelligent + subExos arriveront en tranche 4.</div>
+    <div class="admin-field">
+      ${hasSubExos
+        ? `<button class="admin-btn" onclick="adminConvertToSimple()">Reconvertir en exercice simple (supprime subExos)</button>`
+        : `<button class="admin-btn" onclick="adminConvertToCombined()">Convertir en exercice combiné (subExos)</button>`
+      }
+    </div>
     <div class="admin-actions">
       <button class="admin-btn admin-btn-icon" onclick="adminMoveExercise('${dayId}','${sessionId}','${exerciseId}',-1)" title="Monter">↑</button>
       <button class="admin-btn admin-btn-icon" onclick="adminMoveExercise('${dayId}','${sessionId}','${exerciseId}',1)" title="Descendre">↓</button>
@@ -1900,19 +1952,239 @@ function renderExerciseEditor(dayId, sessionId, exerciseId) {
   `;
 }
 
+// ── Reps builder : reps/durée + latéralité + aperçu ──
+function parseRepsStructure(reps) {
+  if (!reps) return { mode:'reps', sets:3, per:10, lateral:false, free:false };
+  const s = String(reps).trim();
+  let m = s.match(/^(\d+)\s*[×x]\s*(\d+)\s*s(ec|econdes)?\s*(\/\s*c[oô]t[eé])?$/i);
+  if (m) return { mode:'duration', sets:parseInt(m[1],10), per:parseInt(m[2],10), lateral:!!m[4], free:false };
+  m = s.match(/^(\d+)\s*[×x]\s*(\d+)\s*(\/\s*c[oô]t[eé])?$/i);
+  if (m) return { mode:'reps', sets:parseInt(m[1],10), per:parseInt(m[2],10), lateral:!!m[3], free:false };
+  return { mode:'reps', sets:0, per:0, lateral:false, free:true };
+}
+
+function buildRepsString(mode, sets, per, lateral) {
+  if (!sets || !per) return '';
+  const lat = lateral ? ' /côté' : '';
+  return mode === 'duration' ? `${sets} × ${per} s${lat}` : `${sets} × ${per}${lat}`;
+}
+
+function renderRepsBuilder(ex) {
+  const p = parseRepsStructure(ex.reps);
+  const free = p.free || adminState.repsFreeMode;
+  if (free) {
+    return `
+      <div class="admin-builder">
+        <div class="admin-builder-header">
+          <span class="admin-builder-title">Séries & répétitions (mode libre)</span>
+          <button class="admin-builder-toggle" onclick="adminToggleRepsFree(false)">Revenir au builder</button>
+        </div>
+        <div class="admin-field-row">
+          <div class="admin-field"><label>Reps (texte libre)</label><input type="text" data-field="reps" value="${adminEscapeAttr(ex.reps||'')}"></div>
+          <div class="admin-field"><label>Durée totale (sec)</label><input type="text" data-field="sec" value="${ex.sec||0}"></div>
+        </div>
+        <div class="admin-hint">Utilise le mode libre pour les formats non standard (ex: "10 souffles", "10 × chaque sens").</div>
+      </div>
+    `;
+  }
+  const preview = buildRepsString(p.mode, p.sets, p.per, p.lateral) || '(vide)';
+  const secCalc = p.mode === 'duration' ? p.sets * p.per * (p.lateral ? 2 : 1) : (ex.sec || 0);
+  return `
+    <div class="admin-builder">
+      <div class="admin-builder-header">
+        <span class="admin-builder-title">Séries & répétitions</span>
+        <button class="admin-builder-toggle" onclick="adminToggleRepsFree(true)">Forcer valeur libre</button>
+      </div>
+      <div class="admin-builder-modes">
+        <label><input type="radio" name="rb-mode" value="reps" ${p.mode==='reps'?'checked':''}> Reps</label>
+        <label><input type="radio" name="rb-mode" value="duration" ${p.mode==='duration'?'checked':''}> Durée</label>
+      </div>
+      <div class="admin-field-row">
+        <div class="admin-field"><label>Séries (sets)</label><input id="rb-sets" type="number" min="1" value="${p.sets||3}"></div>
+        <div class="admin-field"><label>Par série <span id="rb-unit">${p.mode==='duration'?'(secondes)':'(répétitions)'}</span></label><input id="rb-per" type="number" min="0" value="${p.per||10}"></div>
+      </div>
+      <div class="admin-field-checks" style="margin-bottom:8px">
+        <label><input id="rb-lat" type="checkbox" ${p.lateral?'checked':''}> Latéralité /côté (double la durée totale)</label>
+      </div>
+      ${p.mode==='reps' ? `<div class="admin-field"><label>Durée totale estimée (sec)</label><input type="text" data-field="sec" value="${ex.sec||0}"></div>` : ''}
+      <div class="admin-builder-preview">
+        <span>reps → <code id="rb-preview">${adminEscapeHTML(preview)}</code></span>
+        <span>sec → <code id="rb-sec">${secCalc}</code></span>
+      </div>
+    </div>
+  `;
+}
+
+function adminToggleRepsFree(v) {
+  adminState.repsFreeMode = !!v;
+  renderAdminEditor();
+}
+
+// ── SubExos (exercices combinés comme Sphinx→Enfant) ──
+function renderSubExosEditor(ex) {
+  const subs = ex.subExos || [];
+  const sets = ex.sets || 3;
+  let rows = '';
+  subs.forEach((sub, i) => {
+    rows += `<div class="admin-subexo-row">
+      <input type="text" data-sub-idx="${i}" data-sub-field="name" value="${adminEscapeAttr(sub.name||'')}" placeholder="Nom de la posture">
+      <input type="number" min="0" data-sub-idx="${i}" data-sub-field="sec" value="${sub.sec||0}">
+      <div class="admin-subexo-actions">
+        <button class="admin-btn admin-btn-icon" onclick="adminSubExoMove(${i},-1)" title="Monter">↑</button>
+        <button class="admin-btn admin-btn-icon" onclick="adminSubExoMove(${i},1)" title="Descendre">↓</button>
+        <button class="admin-btn admin-btn-icon danger" onclick="adminSubExoDelete(${i})" title="Supprimer">×</button>
+      </div>
+    </div>`;
+  });
+  return `
+    <div class="admin-subexos">
+      <div class="admin-builder-header">
+        <span class="admin-builder-title">Sous-exercices (postures alternées)</span>
+        <button class="admin-builder-toggle" onclick="adminSubExoAdd()">+ Ajouter</button>
+      </div>
+      <div class="admin-field-row">
+        <div class="admin-field"><label>Cycles complets (sets)</label><input type="number" min="1" data-field="sets" value="${sets}"></div>
+        <div></div>
+      </div>
+      ${rows || '<div class="admin-hint">Aucune posture. Ajoute au moins deux postures.</div>'}
+      <div class="admin-hint">Règle : 15 s de repos entre chaque cycle complet ; 0 s entre postures d'un même cycle.</div>
+    </div>
+  `;
+}
+
+function adminSubExoAdd() {
+  const s = adminState.selected;
+  if (!s || s.kind !== 'exercise') return;
+  const ex = adminFindExercise(s.dayId, s.sessionId, s.exerciseId);
+  if (!ex) return;
+  if (!ex.subExos) ex.subExos = [];
+  ex.subExos.push({ name:'Posture', sec:15 });
+  if (!ex.sets) ex.sets = 3;
+  saveConfig(LIVE_CONFIG);
+  renderAdminEditor();
+}
+
+function adminSubExoDelete(idx) {
+  if (!confirm('Supprimer cette posture ?')) return;
+  const s = adminState.selected;
+  const ex = adminFindExercise(s.dayId, s.sessionId, s.exerciseId);
+  if (!ex || !ex.subExos) return;
+  ex.subExos.splice(idx, 1);
+  saveConfig(LIVE_CONFIG);
+  renderAdminEditor();
+}
+
+function adminSubExoMove(idx, delta) {
+  const s = adminState.selected;
+  const ex = adminFindExercise(s.dayId, s.sessionId, s.exerciseId);
+  if (!ex || !ex.subExos) return;
+  const newIdx = idx + delta;
+  if (newIdx < 0 || newIdx >= ex.subExos.length) return;
+  [ex.subExos[idx], ex.subExos[newIdx]] = [ex.subExos[newIdx], ex.subExos[idx]];
+  saveConfig(LIVE_CONFIG);
+  renderAdminEditor();
+}
+
+function adminConvertToCombined() {
+  const s = adminState.selected;
+  const ex = adminFindExercise(s.dayId, s.sessionId, s.exerciseId);
+  if (!ex) return;
+  ex.subExos = [ { name:'Posture 1', sec:15 }, { name:'Posture 2', sec:15 } ];
+  if (!ex.sets) ex.sets = 3;
+  saveConfig(LIVE_CONFIG);
+  renderAdminEditor();
+}
+
+function adminConvertToSimple() {
+  if (!confirm('Supprimer les subExos et revenir à un exercice simple ?')) return;
+  const s = adminState.selected;
+  const ex = adminFindExercise(s.dayId, s.sessionId, s.exerciseId);
+  if (!ex) return;
+  delete ex.subExos;
+  delete ex.sets;
+  saveConfig(LIVE_CONFIG);
+  renderAdminEditor();
+}
+
 function bindAdminEditorEvents() {
   const editor = document.getElementById('admin-editor');
   if (!editor) return;
-  // input : mutation live (texte / textarea)
+  // input : mutation live (texte / textarea / number)
   editor.addEventListener('input', (ev) => {
+    // 1) SubExo inputs (name/sec)
+    const subEl = ev.target.closest('[data-sub-field]');
+    if (subEl) {
+      const idx = parseInt(subEl.getAttribute('data-sub-idx'),10);
+      const field = subEl.getAttribute('data-sub-field');
+      adminSubExoUpdate(idx, field, subEl.value);
+      return;
+    }
+    // 2) Reps builder inputs (id-based)
+    if (ev.target.id === 'rb-sets' || ev.target.id === 'rb-per' || ev.target.id === 'rb-lat') {
+      repsBuilderRecompute();
+      return;
+    }
+    // 3) Champs classiques data-field
     const el = ev.target.closest('[data-field]');
     if (!el) return;
     const field = el.getAttribute('data-field');
     const value = el.type === 'checkbox' ? el.checked : (el.value ?? '');
     adminApplyFieldEdit(field, value);
   });
-  // change : rafraîchit l'arbre pour voir les labels/types mis à jour (sur blur)
-  editor.addEventListener('change', () => { renderAdminTree(); });
+  editor.addEventListener('change', (ev) => {
+    // Changement du mode du reps builder → recompute et re-render (pour l'unité affichée + durée/reps)
+    if (ev.target.name === 'rb-mode') {
+      repsBuilderRecompute();
+      renderAdminEditor();
+      return;
+    }
+    const el = ev.target.closest('[data-field]');
+    if (el) {
+      const field = el.getAttribute('data-field');
+      // Re-render éditeur si un champ modifie la structure conditionnelle affichée
+      if (field === 'isVelo' || field === 'type') { renderAdminEditor(); }
+    }
+    renderAdminTree();
+  });
+}
+
+function repsBuilderRecompute() {
+  const s = adminState.selected;
+  if (!s || s.kind !== 'exercise') return;
+  const ex = adminFindExercise(s.dayId, s.sessionId, s.exerciseId);
+  if (!ex) return;
+  const modeEl = document.querySelector('#admin-editor input[name="rb-mode"]:checked');
+  const setsEl = document.getElementById('rb-sets');
+  const perEl = document.getElementById('rb-per');
+  const latEl = document.getElementById('rb-lat');
+  if (!modeEl || !setsEl || !perEl) return;
+  const mode = modeEl.value;
+  const sets = parseInt(setsEl.value,10) || 0;
+  const per = parseInt(perEl.value,10) || 0;
+  const lat = !!(latEl && latEl.checked);
+  ex.reps = buildRepsString(mode, sets, per, lat);
+  if (mode === 'duration') ex.sec = sets * per * (lat ? 2 : 1);
+  const prev = document.getElementById('rb-preview');
+  const secLbl = document.getElementById('rb-sec');
+  const unit = document.getElementById('rb-unit');
+  if (prev) prev.textContent = ex.reps || '(vide)';
+  if (secLbl) secLbl.textContent = ex.sec || 0;
+  if (unit) unit.textContent = mode === 'duration' ? '(secondes)' : '(répétitions)';
+  saveConfig(LIVE_CONFIG);
+}
+
+function adminSubExoUpdate(idx, field, value) {
+  const s = adminState.selected;
+  if (!s || s.kind !== 'exercise') return;
+  const ex = adminFindExercise(s.dayId, s.sessionId, s.exerciseId);
+  if (!ex || !ex.subExos || !ex.subExos[idx]) return;
+  if (field === 'sec') {
+    const n = parseInt(value,10);
+    ex.subExos[idx].sec = isNaN(n) ? 0 : n;
+  } else {
+    ex.subExos[idx][field] = value;
+  }
+  saveConfig(LIVE_CONFIG);
 }
 
 function adminApplyFieldEdit(field, value) {
@@ -1923,11 +2195,25 @@ function adminApplyFieldEdit(field, value) {
   else if (s.kind === 'session') target = adminFindSession(s.dayId, s.sessionId);
   else if (s.kind === 'exercise') target = adminFindExercise(s.dayId, s.sessionId, s.exerciseId);
   if (!target) return;
-  if (field === 'sec') {
+  // Chemin pointé : ex. "veloStats.km"
+  if (field.includes('.')) {
+    const [root, sub] = field.split('.');
+    if (!target[root]) target[root] = {};
+    target[root][sub] = value;
+  } else if (field === 'sec' || field === 'sets') {
     const n = parseInt(value, 10);
-    target.sec = isNaN(n) ? 0 : n;
+    target[field] = isNaN(n) ? 0 : n;
   } else if (field === 'isVelo' || field === 'isMuscu' || field === 'isYoga') {
-    if (value) target[field] = true; else delete target[field];
+    if (value) {
+      target[field] = true;
+      if (field === 'isVelo') {
+        if (!target.veloStats) target.veloStats = { km:10, duree:'~30 min', cal:'~220 kcal', difficulte:'Modéré' };
+        if (!target.veloDir) target.veloDir = 'aller';
+        if (target.exercises) delete target.exercises; // une session vélo n'a pas d'exercices
+      }
+    } else {
+      delete target[field];
+    }
   } else {
     target[field] = value;
   }
@@ -2042,6 +2328,79 @@ function adminDeleteExercise(dayId, sessionId, exerciseId) {
   adminState.selected = { kind:'session', dayId, sessionId };
   renderAdminTree();
   renderAdminEditor();
+}
+
+// ── Export / Import / Reset ──
+// Rafraîchit tout le rendu non-admin après un remplacement total de LIVE_CONFIG.
+function adminReRenderAll() {
+  renderAdminTree();
+  renderAdminEditor();
+  renderAllPanels();
+  renderTabs();
+  renderOverview();
+}
+
+function adminExportConfig() {
+  try {
+    if (LIVE_CONFIG && LIVE_CONFIG.meta) LIVE_CONFIG.meta.lastModified = new Date().toISOString();
+    const payload = JSON.stringify(LIVE_CONFIG, null, 2);
+    const blob = new Blob([payload], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0,19);
+    a.href = url;
+    a.download = `fitness_programme_config_${ts}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+  } catch (e) {
+    alert('Export impossible : ' + (e && e.message ? e.message : e));
+  }
+}
+
+function adminImportConfig(event) {
+  const file = event && event.target && event.target.files && event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const parsed = JSON.parse(ev.target.result);
+      if (!isValidConfig(parsed)) {
+        alert('Fichier invalide : structure non reconnue (version, days[7], sessions.bureau/tele/weekend requis).');
+        return;
+      }
+      if (!confirm('Remplacer la configuration actuelle par ce fichier ?\n(La progression hebdomadaire n\'est pas affectée.)')) {
+        return;
+      }
+      if (!parsed.meta) parsed.meta = {};
+      parsed.meta.lastModified = new Date().toISOString();
+      parsed.meta.source = 'import';
+      LIVE_CONFIG = parsed;
+      saveConfig(LIVE_CONFIG, 'import');
+      adminState.selected = null;
+      adminState.expanded = new Set();
+      adminReRenderAll();
+    } catch (e) {
+      alert('Lecture impossible : ' + (e && e.message ? e.message : e));
+    } finally {
+      // Reset l'input pour autoriser ré-import du même fichier
+      if (event && event.target) event.target.value = '';
+    }
+  };
+  reader.onerror = () => alert('Erreur de lecture du fichier.');
+  reader.readAsText(file);
+}
+
+function adminResetConfig() {
+  if (!confirm('Restaurer la configuration par défaut ?\nTous les jours, sessions et exercices personnalisés seront perdus.\n(La progression hebdomadaire n\'est pas affectée.)')) {
+    return;
+  }
+  LIVE_CONFIG = cloneDefaultConfig();
+  saveConfig(LIVE_CONFIG, 'default');
+  adminState.selected = null;
+  adminState.expanded = new Set();
+  adminReRenderAll();
 }
 
 // ╔══════════════════════════════════════════════╗
