@@ -43,7 +43,8 @@
       "WebFetch(domain:www.natural-training.fr)",
       "WebFetch(domain:www.magicfit.fr)",
       "WebFetch(domain:conseilsport.decathlon.fr)",
-      "WebFetch(domain:www.nutripure.fr)"
+      "WebFetch(domain:www.nutripure.fr)",
+      "Bash(git show *)"
     ]
   }
 }

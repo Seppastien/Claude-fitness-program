@@ -42,6 +42,10 @@ Les cases séries et la case principale de l'exercice restent toujours cohérent
 - Décocher une série déjà validée → l'exercice repasse à non terminé
 - Cocher/décocher la case principale de l'exercice → toutes les séries suivent
 
+### Fiches techniques des exercices
+
+Chaque exercice peut afficher un lien `↗` vers une ressource externe (vidéo ou guide) pour contrôler la forme. Le lien s'ouvre dans un nouvel onglet sans interrompre le chronomètre en cours.
+
 ### Journal quotidien
 - Notation de la séance (1 à 5 étoiles)
 - Ressenti en un clic (Fatigué / En forme / Difficile / Parfait / Douleur)
@@ -114,6 +118,7 @@ GitHub Pages se met à jour automatiquement en 1–2 minutes.
 
 - HTML / CSS / JavaScript vanilla — aucune dépendance externe
 - Web Audio API pour les bips
+- Screen Wake Lock API pour empêcher la mise en veille de l'écran pendant une séance
 - Google Identity Services (OAuth 2.0)
 - Google Drive API v3
 - localStorage comme cache local et fallback offline

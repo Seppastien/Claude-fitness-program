@@ -29,6 +29,7 @@ programme_semaine.html
     ├── TIMERS       beep*, parseReps, parseRepSets, isDurationEx,
     │                startSerieTimer, renderSeriesTracker, renderRepTracker
     ├── REPLI        toggleSession, toggleExCollapse
+    ├── WAKE LOCK    requestWakeLock() — empêche la mise en veille (Screen Wake Lock API)
     └── WEEK NAV     changeWeek, updateWeekDisplay, init()
 ```
 
@@ -78,6 +79,7 @@ SESSIONS = {
   type: 'gainage|etirement|cardio|muscu|yoga',
   charge: 'string optionnel', // ex: '2×2 kg'
   serieInfo: 'string optionnel', // description affichée UNE FOIS en haut du bloc
+  url: 'string optionnel',    // lien fiche technique externe — affiche ↗ dans le nom
   sets: number,               // uniquement pour subExos
   subExos: [                  // uniquement pour exercices combinés (Sphinx→Enfant)
     { name: 'string', sec: number },
