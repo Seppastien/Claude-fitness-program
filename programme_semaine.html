@@ -432,6 +432,63 @@ const SESSIONS = {
 };
 
 // ╔══════════════════════════════════════════════╗
+// ║  CONFIG — Defaults + Live config utilisateur ║
+// ╚══════════════════════════════════════════════╝
+// DEFAULT_CONFIG : source de vérité figée (les DAYS/TYPE_*/SESSIONS ci-dessus).
+//                  Sert de seed au premier lancement et cible du bouton Reset.
+// LIVE_CONFIG    : config active lue par toutes les fonctions de rendu.
+//                  Initialisée à un clone de DEFAULT_CONFIG, remplacée par
+//                  loadConfig() au démarrage si une config utilisateur existe.
+// Persistance    : localStorage clé 'fitness_config' (Drive ajouté en tranche 2).
+
+const DEFAULT_CONFIG = {
+  version: 1,
+  days: DAYS,
+  typeLabels: TYPE_LABELS,
+  typeColors: TYPE_COLORS,
+  sessions: SESSIONS
+};
+
+const CONFIG_STORAGE_KEY = 'fitness_config';
+
+function cloneDefaultConfig() {
+  return {
+    version: DEFAULT_CONFIG.version,
+    days: JSON.parse(JSON.stringify(DEFAULT_CONFIG.days)),
+    typeLabels: JSON.parse(JSON.stringify(DEFAULT_CONFIG.typeLabels)),
+    typeColors: JSON.parse(JSON.stringify(DEFAULT_CONFIG.typeColors)),
+    sessions: JSON.parse(JSON.stringify(DEFAULT_CONFIG.sessions))
+  };
+}
+
+let LIVE_CONFIG = cloneDefaultConfig();
+
+function isValidConfig(c) {
+  return c && c.version === 1
+    && Array.isArray(c.days) && c.days.length === 7
+    && c.typeLabels && c.typeColors && c.sessions
+    && Array.isArray(c.sessions.bureau)
+    && Array.isArray(c.sessions.tele)
+    && c.sessions.weekend
+    && Array.isArray(c.sessions.weekend.sam)
+    && Array.isArray(c.sessions.weekend.dim);
+}
+
+function loadConfig() {
+  try {
+    const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (isValidConfig(parsed)) {
+        LIVE_CONFIG = parsed;
+        return;
+      }
+    }
+  } catch {}
+  LIVE_CONFIG = cloneDefaultConfig();
+}
+
+// ╔══════════════════════════════════════════════╗
 // ║  STATE — Variables globales & helpers date   ║
 // ╚══════════════════════════════════════════════╝
 // currentWeekOffset : décalage en semaines par rapport à aujourd'hui (0 = semaine courante)
@@ -663,13 +720,14 @@ function saveJournal(dayId, journal) {
 
 // ── Helpers & utilitaires de rendu ──
 function getSessionsForDay(dayId) {
-  const day = DAYS.find(d=>d.id===dayId);
+  const day = LIVE_CONFIG.days.find(d=>d.id===dayId);
+  if (!day) return null;
   if (day.type === 'weekend') {
-    const w = SESSIONS.weekend;
+    const w = LIVE_CONFIG.sessions.weekend;
     if (!w) return null;
     return w[dayId] || null;
   }
-  return SESSIONS[day.type];
+  return LIVE_CONFIG.sessions[day.type];
 }
 
 function countExercises(dayId) {
@@ -694,7 +752,7 @@ function countExercises(dayId) {
 function renderOverview() {
   const bar = document.getElementById('overview-bar');
   bar.innerHTML = '';
-  DAYS.forEach(d => {
+  LIVE_CONFIG.days.forEach(d => {
     const { total, done } = countExercises(d.id);
     const pct = total ? Math.round(done/total*100) : 0;
     const cls = pct===100 ? 'full' : pct>0 ? 'partial' : '';
@@ -710,7 +768,7 @@ function renderOverview() {
 function renderTabs() {
   const tabs = document.getElementById('day-tabs');
   tabs.innerHTML = '';
-  DAYS.forEach(d => {
+  LIVE_CONFIG.days.forEach(d => {
     const { total, done } = countExercises(d.id);
     const tab = document.createElement('div');
     tab.className = 'day-tab' + (d.id===activeDay?' active':'');
@@ -737,7 +795,7 @@ function switchDay(dayId) {
 function renderAllPanels() {
   const container = document.getElementById('day-panels');
   container.innerHTML = '';
-  DAYS.forEach(d => {
+  LIVE_CONFIG.days.forEach(d => {
     const panel = document.createElement('div');
     panel.className = 'day-panel' + (d.id===activeDay?' active':'');
     panel.id = 'panel_'+d.id;
@@ -781,7 +839,7 @@ function renderDayPanel(day) {
     <div class="day-header">
       <div class="day-title-block">
         <div class="day-name">${day.fullName}</div>
-        <span class="day-type-badge badge-${TYPE_COLORS[day.type]}">${TYPE_LABELS[day.type]}</span>
+        <span class="day-type-badge badge-${LIVE_CONFIG.typeColors[day.type]}">${LIVE_CONFIG.typeLabels[day.type]}</span>
       </div>
       <div class="day-stats">
         <div class="stat-pill"><div class="stat-val">${totalMin}</div><div class="stat-lbl">min</div></div>
@@ -1448,9 +1506,10 @@ function updateWeekDisplay() {
 // dayMap convertit getDay() (0=dim) vers l'index dans DAYS (0=lun..6=dim).
 
 (function init() {
+  loadConfig(); // Doit précéder tout rendu : LIVE_CONFIG est la source de vérité.
   const jsDay = new Date().getDay(); // 0=dim, 1=lun...
-  const dayMap = [6,0,1,2,3,4,5]; // JS Sunday=0 → DAYS index 6 (dim), Monday=1 → 0 (lun)...
-  activeDay = DAYS[dayMap[jsDay] ?? 0].id;
+  const dayMap = [6,0,1,2,3,4,5]; // JS Sunday=0 → LIVE_CONFIG.days index 6 (dim), Monday=1 → 0 (lun)...
+  activeDay = LIVE_CONFIG.days[dayMap[jsDay] ?? 0].id;
   updateWeekDisplay();
   renderAllPanels();
   renderTabs();
