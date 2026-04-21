@@ -214,6 +214,49 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .ex-toggle:hover{color:var(--text)}
 .ex-item.collapsed .series-tracker{display:none}
 .ex-item.collapsed .ex-toggle{transform:rotate(-90deg)}
+
+/* ── ADMIN MODE ── */
+.admin-toggle{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#F4F2ED;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;margin-left:10px;line-height:1}
+.admin-toggle:hover{background:rgba(255,255,255,0.2)}
+.admin-toggle.active{background:var(--gold);border-color:var(--gold);color:#1C1A16}
+body.admin-mode .overview-bar,body.admin-mode .day-tabs,body.admin-mode .day-panels{display:none}
+body:not(.admin-mode) .admin-container{display:none}
+.admin-container{padding:.5rem 1.25rem 4rem}
+.admin-banner{background:linear-gradient(90deg,#C9971A,#B88412);color:#fff;padding:10px 14px;border-radius:var(--radius-sm);margin:8px 0 14px;font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.admin-action-btn{background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px}
+.admin-action-btn:hover{background:rgba(255,255,255,0.3)}
+.admin-layout{display:grid;grid-template-columns:minmax(240px,360px) 1fr;gap:14px}
+@media (max-width:820px){.admin-layout{grid-template-columns:1fr}}
+.admin-tree{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:8px;max-height:72vh;overflow:auto}
+.admin-node{padding:5px 6px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:13px;line-height:1.4;user-select:none}
+.admin-node:hover{background:var(--surface2)}
+.admin-node.selected{background:var(--bureau-bg);border:1px solid var(--bureau)}
+.admin-node-day{font-weight:600}
+.admin-node-session{margin-left:14px}
+.admin-node-exercise{margin-left:30px;color:var(--muted);font-size:12px}
+.admin-node-caret{font-size:10px;color:var(--muted2);width:12px;flex-shrink:0;text-align:center}
+.admin-node-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-node-add{margin-left:28px;color:var(--muted2);font-size:12px;padding:3px 6px;cursor:pointer;border-radius:4px;display:inline-block}
+.admin-node-add:hover{background:var(--surface2);color:var(--text)}
+.admin-type-badge{font-size:10px;padding:1px 6px;border-radius:3px;background:var(--surface3);color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.admin-editor{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.admin-editor h3{font-size:15px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.admin-empty{color:var(--muted);font-size:13px;text-align:center;padding:40px 20px}
+.admin-field{margin-bottom:12px}
+.admin-field label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:4px;font-weight:500}
+.admin-field input[type=text],.admin-field textarea,.admin-field select{width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;font:inherit;font-size:13px;background:#fff;color:var(--text)}
+.admin-field textarea{min-height:56px;resize:vertical}
+.admin-field input:focus,.admin-field textarea:focus,.admin-field select:focus{outline:none;border-color:var(--bureau)}
+.admin-field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.admin-field-checks{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.admin-field-checks label{display:inline-flex;align-items:center;gap:5px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer;margin:0}
+.admin-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
+.admin-btn{padding:6px 12px;border:1px solid var(--border2);background:var(--surface);border-radius:6px;cursor:pointer;font-size:12px;color:var(--text)}
+.admin-btn:hover{background:var(--surface2)}
+.admin-btn.danger{color:var(--red);border-color:rgba(184,64,64,0.3)}
+.admin-btn.danger:hover{background:#FBEDED}
+.admin-btn-icon{padding:4px 10px;font-size:13px;line-height:1}
+.admin-hint{font-size:11px;color:var(--muted);font-style:italic;margin-top:6px}
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -229,6 +272,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <button class="week-btn" onclick="changeWeek(-1)">‹</button>
     <span class="week-label" id="week-range-label"></span>
     <button class="week-btn" onclick="changeWeek(1)">›</button>
+    <button class="admin-toggle" id="admin-toggle" onclick="toggleAdminMode()" title="Mode édition">⚙</button>
   </div>
 </div>
 
@@ -249,6 +293,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
 <!-- ── Panneaux jour (générés par renderAllPanels) ── -->
 <div class="day-panels" id="day-panels"></div>
+
+<!-- ── Mode admin : éditeur de configuration (caché par défaut) ── -->
+<div class="admin-container" id="admin-container">
+  <div class="admin-banner">
+    <span>⚠️ Mode édition — toute modification est sauvegardée automatiquement</span>
+    <button class="admin-action-btn" onclick="toggleAdminMode()">Quitter le mode édition</button>
+  </div>
+  <div class="admin-layout">
+    <div class="admin-tree" id="admin-tree"></div>
+    <div class="admin-editor" id="admin-editor">
+      <div class="admin-empty">Sélectionne un jour, une session ou un exercice dans l'arbre pour l'éditer.</div>
+    </div>
+  </div>
+</div>
 
 <script>
 // ╔══════════════════════════════════════════════╗
@@ -1579,6 +1637,414 @@ function updateWeekDisplay() {
 }
 
 // ╔══════════════════════════════════════════════╗
+// ║  ADMIN MODE — Éditeur de configuration       ║
+// ╚══════════════════════════════════════════════╝
+// Activation : bouton ⚙ dans la topbar → toggleAdminMode().
+// Arbre gauche : jours → sessions → exercices. Éditeur droit : formulaire
+// contextuel selon la sélection. Chaque modification appelle saveConfig(LIVE_CONFIG)
+// → localStorage immédiat + scheduleSaveConfig Drive (debounce 2 s).
+// v1 : édition de champs basiques + CRUD + réordonnancement ↑↓.
+// v2 (tranche 4) : éditeur reps intelligent, subExos, veloStats, import/export, reset.
+
+let adminState = {
+  active: false,
+  selected: null,      // { kind:'day'|'session'|'exercise', dayId, sessionId?, exerciseId? }
+  expanded: new Set()  // clés : dayId | dayId+'::'+sessionId
+};
+
+function toggleAdminMode() {
+  adminState.active = !adminState.active;
+  document.body.classList.toggle('admin-mode', adminState.active);
+  const btn = document.getElementById('admin-toggle');
+  if (btn) btn.classList.toggle('active', adminState.active);
+  if (adminState.active) {
+    renderAdminTree();
+    renderAdminEditor();
+  } else {
+    // Re-rendre le planning avec la nouvelle config
+    renderAllPanels(); renderTabs(); renderOverview();
+  }
+}
+
+// ── Helpers données ──
+function adminKey(dayId, sessionId) { return sessionId ? dayId + '::' + sessionId : dayId; }
+
+function getSessionsForDayConfig(dayId) {
+  const day = LIVE_CONFIG.days.find(d => d.id === dayId);
+  if (!day) return [];
+  if (day.type === 'weekend') {
+    if (!LIVE_CONFIG.sessions.weekend) LIVE_CONFIG.sessions.weekend = { sam:[], dim:[] };
+    if (!LIVE_CONFIG.sessions.weekend[dayId]) LIVE_CONFIG.sessions.weekend[dayId] = [];
+    return LIVE_CONFIG.sessions.weekend[dayId];
+  }
+  if (!LIVE_CONFIG.sessions[day.type]) LIVE_CONFIG.sessions[day.type] = [];
+  return LIVE_CONFIG.sessions[day.type];
+}
+
+function adminFindSession(dayId, sessionId) {
+  return getSessionsForDayConfig(dayId).find(s => s.id === sessionId);
+}
+
+function adminFindExercise(dayId, sessionId, exerciseId) {
+  const s = adminFindSession(dayId, sessionId);
+  if (!s || !s.exercises) return null;
+  return s.exercises.find(e => e.id === exerciseId);
+}
+
+function adminCollectAllExerciseIds() {
+  const all = [];
+  ['bureau','tele'].forEach(t => (LIVE_CONFIG.sessions[t]||[]).forEach(s => (s.exercises||[]).forEach(e => all.push(e.id))));
+  ['sam','dim'].forEach(d => (LIVE_CONFIG.sessions.weekend && LIVE_CONFIG.sessions.weekend[d]||[]).forEach(s => (s.exercises||[]).forEach(e => all.push(e.id))));
+  return all;
+}
+
+function adminNewId(prefix, existing) {
+  let n = 1;
+  while (existing.includes(prefix + n)) n++;
+  return prefix + n;
+}
+
+function adminEscapeHTML(s) { return String(s==null?'':s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function adminEscapeAttr(s) { return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ── Arbre ──
+function isNodeSelected(kind, dayId, sessionId, exerciseId) {
+  const s = adminState.selected;
+  if (!s || s.kind !== kind || s.dayId !== dayId) return false;
+  if (kind === 'session') return s.sessionId === sessionId;
+  if (kind === 'exercise') return s.sessionId === sessionId && s.exerciseId === exerciseId;
+  return true;
+}
+
+function renderAdminTree() {
+  const tree = document.getElementById('admin-tree');
+  if (!tree) return;
+  let html = '';
+  LIVE_CONFIG.days.forEach(day => {
+    const dayExpanded = adminState.expanded.has(day.id);
+    const daySelected = isNodeSelected('day', day.id) ? 'selected' : '';
+    const caret = dayExpanded ? '▾' : '▸';
+    html += `<div class="admin-node admin-node-day ${daySelected}" data-kind="day" data-day="${day.id}">
+      <span class="admin-node-caret" data-toggle="${day.id}">${caret}</span>
+      <span class="admin-node-label">${adminEscapeHTML(day.fullName)}</span>
+      <span class="admin-type-badge">${day.type}</span>
+    </div>`;
+    if (dayExpanded) {
+      const sessions = getSessionsForDayConfig(day.id);
+      sessions.forEach(s => {
+        const key = adminKey(day.id, s.id);
+        const sExp = adminState.expanded.has(key);
+        const sSel = isNodeSelected('session', day.id, s.id) ? 'selected' : '';
+        const sCaret = sExp ? '▾' : '▸';
+        html += `<div class="admin-node admin-node-session ${sSel}" data-kind="session" data-day="${day.id}" data-session="${s.id}">
+          <span class="admin-node-caret" data-toggle="${key}">${sCaret}</span>
+          <span class="admin-node-label">${adminEscapeHTML((s.emoji||'')+' '+(s.title||'(sans titre)'))}</span>
+        </div>`;
+        if (sExp) {
+          (s.exercises||[]).forEach(ex => {
+            const exSel = isNodeSelected('exercise', day.id, s.id, ex.id) ? 'selected' : '';
+            html += `<div class="admin-node admin-node-exercise ${exSel}" data-kind="exercise" data-day="${day.id}" data-session="${s.id}" data-exercise="${ex.id}">
+              <span class="admin-node-caret"></span>
+              <span class="admin-node-label">${adminEscapeHTML(ex.name||'(sans nom)')}</span>
+            </div>`;
+          });
+          if (!s.isVelo) {
+            html += `<div class="admin-node-add" data-action="add-exercise" data-day="${day.id}" data-session="${s.id}">+ Ajouter un exercice</div>`;
+          }
+        }
+      });
+      html += `<div class="admin-node-add" data-action="add-session" data-day="${day.id}">+ Ajouter une session</div>`;
+    }
+  });
+  tree.innerHTML = html;
+}
+
+function bindAdminTreeEvents() {
+  const tree = document.getElementById('admin-tree');
+  if (!tree) return;
+  tree.addEventListener('click', (ev) => {
+    const toggleEl = ev.target.closest('[data-toggle]');
+    if (toggleEl) {
+      ev.stopPropagation();
+      const key = toggleEl.getAttribute('data-toggle');
+      if (adminState.expanded.has(key)) adminState.expanded.delete(key);
+      else adminState.expanded.add(key);
+      renderAdminTree();
+      return;
+    }
+    const addEl = ev.target.closest('[data-action]');
+    if (addEl) {
+      const action = addEl.getAttribute('data-action');
+      if (action === 'add-session') adminAddSession(addEl.getAttribute('data-day'));
+      else if (action === 'add-exercise') adminAddExercise(addEl.getAttribute('data-day'), addEl.getAttribute('data-session'));
+      return;
+    }
+    const nodeEl = ev.target.closest('.admin-node');
+    if (nodeEl) {
+      adminSelect(
+        nodeEl.getAttribute('data-kind'),
+        nodeEl.getAttribute('data-day'),
+        nodeEl.getAttribute('data-session'),
+        nodeEl.getAttribute('data-exercise')
+      );
+    }
+  });
+}
+
+function adminSelect(kind, dayId, sessionId, exerciseId) {
+  adminState.selected = { kind, dayId, sessionId, exerciseId };
+  if (kind === 'session' || kind === 'exercise') adminState.expanded.add(dayId);
+  if (kind === 'exercise') adminState.expanded.add(adminKey(dayId, sessionId));
+  renderAdminTree();
+  renderAdminEditor();
+}
+
+// ── Éditeur ──
+function renderAdminEditor() {
+  const editor = document.getElementById('admin-editor');
+  if (!editor) return;
+  const s = adminState.selected;
+  if (!s) {
+    editor.innerHTML = '<div class="admin-empty">Sélectionne un jour, une session ou un exercice dans l\'arbre pour l\'éditer.</div>';
+    return;
+  }
+  if (s.kind === 'day') editor.innerHTML = renderDayEditor(s.dayId);
+  else if (s.kind === 'session') editor.innerHTML = renderSessionEditor(s.dayId, s.sessionId);
+  else if (s.kind === 'exercise') editor.innerHTML = renderExerciseEditor(s.dayId, s.sessionId, s.exerciseId);
+}
+
+function renderDayEditor(dayId) {
+  const day = LIVE_CONFIG.days.find(d => d.id === dayId);
+  if (!day) return '<div class="admin-empty">Jour introuvable.</div>';
+  return `
+    <h3>Jour : ${adminEscapeHTML(day.fullName)}</h3>
+    <div class="admin-field-row">
+      <div class="admin-field"><label>Label court</label><input type="text" data-field="label" value="${adminEscapeAttr(day.label)}"></div>
+      <div class="admin-field"><label>Nom complet</label><input type="text" data-field="fullName" value="${adminEscapeAttr(day.fullName)}"></div>
+    </div>
+    <div class="admin-field">
+      <label>Type</label>
+      <select data-field="type">
+        <option value="bureau"${day.type==='bureau'?' selected':''}>Bureau + Vélo</option>
+        <option value="tele"${day.type==='tele'?' selected':''}>Télétravail</option>
+        <option value="weekend"${day.type==='weekend'?' selected':''}>Week-end</option>
+      </select>
+      <div class="admin-hint">Change le type → l'ensemble des sessions affichées ce jour.</div>
+    </div>
+  `;
+}
+
+function renderSessionEditor(dayId, sessionId) {
+  const s = adminFindSession(dayId, sessionId);
+  if (!s) return '<div class="admin-empty">Session introuvable.</div>';
+  return `
+    <h3>Session : ${adminEscapeHTML(s.title || '(sans titre)')}</h3>
+    <div class="admin-field-row">
+      <div class="admin-field"><label>Emoji</label><input type="text" data-field="emoji" value="${adminEscapeAttr(s.emoji||'')}" maxlength="4"></div>
+      <div class="admin-field"><label>Durée affichée</label><input type="text" data-field="duration" value="${adminEscapeAttr(s.duration||'')}"></div>
+    </div>
+    <div class="admin-field"><label>Titre</label><input type="text" data-field="title" value="${adminEscapeAttr(s.title||'')}"></div>
+    <div class="admin-field"><label>Description</label><textarea data-field="desc">${adminEscapeHTML(s.desc||'')}</textarea></div>
+    <div class="admin-field"><label>Note (bannière jaune)</label><textarea data-field="note">${adminEscapeHTML(s.note||'')}</textarea></div>
+    <div class="admin-field">
+      <label>Flags</label>
+      <div class="admin-field-checks">
+        <label><input type="checkbox" data-field="isVelo" ${s.isVelo?'checked':''}> Vélo</label>
+        <label><input type="checkbox" data-field="isMuscu" ${s.isMuscu?'checked':''}> Muscu</label>
+        <label><input type="checkbox" data-field="isYoga" ${s.isYoga?'checked':''}> Yoga</label>
+      </div>
+      <div class="admin-hint">veloStats/veloDir éditables en tranche 4.</div>
+    </div>
+    <div class="admin-actions">
+      <button class="admin-btn admin-btn-icon" onclick="adminMoveSession('${dayId}','${sessionId}',-1)" title="Monter">↑</button>
+      <button class="admin-btn admin-btn-icon" onclick="adminMoveSession('${dayId}','${sessionId}',1)" title="Descendre">↓</button>
+      <button class="admin-btn" onclick="adminDuplicateSession('${dayId}','${sessionId}')">Dupliquer</button>
+      <button class="admin-btn danger" onclick="adminDeleteSession('${dayId}','${sessionId}')">Supprimer</button>
+    </div>
+  `;
+}
+
+function renderExerciseEditor(dayId, sessionId, exerciseId) {
+  const ex = adminFindExercise(dayId, sessionId, exerciseId);
+  if (!ex) return '<div class="admin-empty">Exercice introuvable.</div>';
+  return `
+    <h3>Exercice : ${adminEscapeHTML(ex.name || '(sans nom)')}</h3>
+    <div class="admin-field"><label>Nom</label><input type="text" data-field="name" value="${adminEscapeAttr(ex.name||'')}"></div>
+    <div class="admin-field"><label>Description</label><textarea data-field="desc">${adminEscapeHTML(ex.desc||'')}</textarea></div>
+    <div class="admin-field-row">
+      <div class="admin-field"><label>Reps (ex : 3 × 12, 3 × 40 s /côté)</label><input type="text" data-field="reps" value="${adminEscapeAttr(ex.reps||'')}"></div>
+      <div class="admin-field"><label>Durée totale (sec)</label><input type="text" data-field="sec" value="${ex.sec||0}"></div>
+    </div>
+    <div class="admin-field-row">
+      <div class="admin-field">
+        <label>Type</label>
+        <select data-field="type">
+          <option value="gainage"${ex.type==='gainage'?' selected':''}>Gainage</option>
+          <option value="etirement"${ex.type==='etirement'?' selected':''}>Étirement</option>
+          <option value="cardio"${ex.type==='cardio'?' selected':''}>Cardio</option>
+          <option value="muscu"${ex.type==='muscu'?' selected':''}>Musculation</option>
+          <option value="yoga"${ex.type==='yoga'?' selected':''}>Yoga</option>
+        </select>
+      </div>
+      <div class="admin-field"><label>Charge</label><input type="text" data-field="charge" value="${adminEscapeAttr(ex.charge||'')}"></div>
+    </div>
+    <div class="admin-field"><label>Info série (serieInfo)</label><input type="text" data-field="serieInfo" value="${adminEscapeAttr(ex.serieInfo||'')}"></div>
+    <div class="admin-field"><label>Lien fiche technique (url)</label><input type="text" data-field="url" value="${adminEscapeAttr(ex.url||'')}"></div>
+    <div class="admin-hint">Éditeur de séries intelligent + subExos arriveront en tranche 4.</div>
+    <div class="admin-actions">
+      <button class="admin-btn admin-btn-icon" onclick="adminMoveExercise('${dayId}','${sessionId}','${exerciseId}',-1)" title="Monter">↑</button>
+      <button class="admin-btn admin-btn-icon" onclick="adminMoveExercise('${dayId}','${sessionId}','${exerciseId}',1)" title="Descendre">↓</button>
+      <button class="admin-btn" onclick="adminDuplicateExercise('${dayId}','${sessionId}','${exerciseId}')">Dupliquer</button>
+      <button class="admin-btn danger" onclick="adminDeleteExercise('${dayId}','${sessionId}','${exerciseId}')">Supprimer</button>
+    </div>
+  `;
+}
+
+function bindAdminEditorEvents() {
+  const editor = document.getElementById('admin-editor');
+  if (!editor) return;
+  // input : mutation live (texte / textarea)
+  editor.addEventListener('input', (ev) => {
+    const el = ev.target.closest('[data-field]');
+    if (!el) return;
+    const field = el.getAttribute('data-field');
+    const value = el.type === 'checkbox' ? el.checked : (el.value ?? '');
+    adminApplyFieldEdit(field, value);
+  });
+  // change : rafraîchit l'arbre pour voir les labels/types mis à jour (sur blur)
+  editor.addEventListener('change', () => { renderAdminTree(); });
+}
+
+function adminApplyFieldEdit(field, value) {
+  const s = adminState.selected;
+  if (!s) return;
+  let target = null;
+  if (s.kind === 'day') target = LIVE_CONFIG.days.find(d => d.id === s.dayId);
+  else if (s.kind === 'session') target = adminFindSession(s.dayId, s.sessionId);
+  else if (s.kind === 'exercise') target = adminFindExercise(s.dayId, s.sessionId, s.exerciseId);
+  if (!target) return;
+  if (field === 'sec') {
+    const n = parseInt(value, 10);
+    target.sec = isNaN(n) ? 0 : n;
+  } else if (field === 'isVelo' || field === 'isMuscu' || field === 'isYoga') {
+    if (value) target[field] = true; else delete target[field];
+  } else {
+    target[field] = value;
+  }
+  if (s.kind === 'day' && field === 'type') ensureSessionsArrayForDay(s.dayId);
+  saveConfig(LIVE_CONFIG);
+}
+
+function ensureSessionsArrayForDay(dayId) {
+  const day = LIVE_CONFIG.days.find(d => d.id === dayId);
+  if (!day) return;
+  if (day.type === 'weekend') {
+    if (!LIVE_CONFIG.sessions.weekend) LIVE_CONFIG.sessions.weekend = { sam:[], dim:[] };
+    if (!LIVE_CONFIG.sessions.weekend[dayId]) LIVE_CONFIG.sessions.weekend[dayId] = [];
+  } else if (!LIVE_CONFIG.sessions[day.type]) {
+    LIVE_CONFIG.sessions[day.type] = [];
+  }
+}
+
+// ── CRUD ──
+function adminAddSession(dayId) {
+  const sessions = getSessionsForDayConfig(dayId);
+  const id = adminNewId('session_', sessions.map(s => s.id));
+  sessions.push({ id, emoji:'✨', title:'Nouvelle session', desc:'', duration:'', exercises:[] });
+  saveConfig(LIVE_CONFIG);
+  adminState.expanded.add(dayId);
+  adminSelect('session', dayId, id);
+}
+
+function adminAddExercise(dayId, sessionId) {
+  const session = adminFindSession(dayId, sessionId);
+  if (!session) return;
+  if (!session.exercises) session.exercises = [];
+  const id = adminNewId('exo_', adminCollectAllExerciseIds());
+  session.exercises.push({ id, name:'Nouvel exercice', desc:'', reps:'3 × 10', sec:0, type:'gainage' });
+  saveConfig(LIVE_CONFIG);
+  adminState.expanded.add(adminKey(dayId, sessionId));
+  adminSelect('exercise', dayId, sessionId, id);
+}
+
+function adminMoveSession(dayId, sessionId, delta) {
+  const sessions = getSessionsForDayConfig(dayId);
+  const idx = sessions.findIndex(s => s.id === sessionId);
+  const newIdx = idx + delta;
+  if (idx < 0 || newIdx < 0 || newIdx >= sessions.length) return;
+  [sessions[idx], sessions[newIdx]] = [sessions[newIdx], sessions[idx]];
+  saveConfig(LIVE_CONFIG);
+  renderAdminTree();
+}
+
+function adminMoveExercise(dayId, sessionId, exerciseId, delta) {
+  const session = adminFindSession(dayId, sessionId);
+  if (!session || !session.exercises) return;
+  const idx = session.exercises.findIndex(e => e.id === exerciseId);
+  const newIdx = idx + delta;
+  if (idx < 0 || newIdx < 0 || newIdx >= session.exercises.length) return;
+  [session.exercises[idx], session.exercises[newIdx]] = [session.exercises[newIdx], session.exercises[idx]];
+  saveConfig(LIVE_CONFIG);
+  renderAdminTree();
+}
+
+function adminDuplicateSession(dayId, sessionId) {
+  const sessions = getSessionsForDayConfig(dayId);
+  const idx = sessions.findIndex(s => s.id === sessionId);
+  if (idx < 0) return;
+  const clone = JSON.parse(JSON.stringify(sessions[idx]));
+  clone.id = adminNewId('session_', sessions.map(s => s.id));
+  clone.title = (clone.title||'') + ' (copie)';
+  const allIds = adminCollectAllExerciseIds();
+  (clone.exercises||[]).forEach(e => {
+    const newId = adminNewId('exo_', allIds);
+    allIds.push(newId);
+    e.id = newId;
+  });
+  sessions.splice(idx+1, 0, clone);
+  saveConfig(LIVE_CONFIG);
+  adminSelect('session', dayId, clone.id);
+}
+
+function adminDuplicateExercise(dayId, sessionId, exerciseId) {
+  const session = adminFindSession(dayId, sessionId);
+  if (!session || !session.exercises) return;
+  const idx = session.exercises.findIndex(e => e.id === exerciseId);
+  if (idx < 0) return;
+  const clone = JSON.parse(JSON.stringify(session.exercises[idx]));
+  clone.id = adminNewId('exo_', adminCollectAllExerciseIds());
+  clone.name = (clone.name||'') + ' (copie)';
+  session.exercises.splice(idx+1, 0, clone);
+  saveConfig(LIVE_CONFIG);
+  adminSelect('exercise', dayId, sessionId, clone.id);
+}
+
+function adminDeleteSession(dayId, sessionId) {
+  if (!confirm('Supprimer cette session et tous ses exercices ?')) return;
+  const sessions = getSessionsForDayConfig(dayId);
+  const idx = sessions.findIndex(s => s.id === sessionId);
+  if (idx < 0) return;
+  sessions.splice(idx, 1);
+  saveConfig(LIVE_CONFIG);
+  adminState.selected = { kind:'day', dayId };
+  renderAdminTree();
+  renderAdminEditor();
+}
+
+function adminDeleteExercise(dayId, sessionId, exerciseId) {
+  if (!confirm('Supprimer cet exercice ?')) return;
+  const session = adminFindSession(dayId, sessionId);
+  if (!session || !session.exercises) return;
+  const idx = session.exercises.findIndex(e => e.id === exerciseId);
+  if (idx < 0) return;
+  session.exercises.splice(idx, 1);
+  saveConfig(LIVE_CONFIG);
+  adminState.selected = { kind:'session', dayId, sessionId };
+  renderAdminTree();
+  renderAdminEditor();
+}
+
+// ╔══════════════════════════════════════════════╗
 // ║  INIT — Point d'entrée                       ║
 // ╚══════════════════════════════════════════════╝
 // Détecte le jour courant, charge les données, rend l'UI.
@@ -1594,6 +2060,8 @@ function updateWeekDisplay() {
   renderAllPanels();
   renderTabs();
   renderOverview();
+  bindAdminTreeEvents();
+  bindAdminEditorEvents();
   setTimeout(tryRestoreToken, 800);
 
   // Wake Lock — empêche la mise en veille de l'écran
