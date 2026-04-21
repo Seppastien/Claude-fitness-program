@@ -1456,6 +1456,19 @@ function updateWeekDisplay() {
   renderTabs();
   renderOverview();
   setTimeout(tryRestoreToken, 800);
+
+  // Wake Lock — empêche la mise en veille de l'écran
+  let wakeLock = null;
+  async function requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+    } catch {}
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') requestWakeLock();
+  });
+  requestWakeLock();
 })();
 </script>
 </body>
