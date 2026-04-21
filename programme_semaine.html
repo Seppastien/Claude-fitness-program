@@ -95,7 +95,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .ex-check{width:20px;height:20px;border:1.5px solid var(--border2);border-radius:5px;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;transition:all .15s;background:var(--surface);cursor:pointer;padding:0;font-size:11px;color:white;font-family:inherit}
 .ex-row.checked .ex-check{background:var(--green);border-color:var(--green);color:white;font-size:11px}
 .ex-body{flex:1}
-.ex-name{font-size:13.5px;font-weight:500}
+.ex-name{font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.ex-info-link{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:4px;background:var(--surface2);color:var(--muted);text-decoration:none;font-size:10px;flex-shrink:0;transition:background .15s,color .15s;border:1px solid var(--border)}
+.ex-info-link:hover{background:var(--text);color:#fff;border-color:var(--text)}
 .ex-desc{font-size:11.5px;color:var(--muted);line-height:1.5;font-weight:300;margin-top:2px}
 .ex-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
 .ex-reps{font-family:'DM Mono',monospace;font-size:11px;background:var(--surface2);padding:2px 8px;border-radius:5px;white-space:nowrap}
@@ -277,11 +279,11 @@ const SESSIONS = {
       id:'matin_bureau', emoji:'🌅', title:'Matin — Activation lombaire',
       desc:'Avant le vélo · 15–18 min', duration:'15–18 min',
       exercises:[
-        {id:'b_m1', name:'Respiration diaphragmatique', desc:'Allongé, gonfle le ventre, tiens 5 s. Active le transverse.', reps:'10 souffles', sec:90, type:'gainage', serieInfo:'10 souffles · inspire 4 s · tenu 5 s · expire 6 s'},
-        {id:'b_m2', name:'Knee-to-chest', desc:'Genoux ramenés vers la poitrine, maintiens doucement 30 s. Décompresse les lombaires.', reps:'3 × 30 s', sec:90, type:'etirement'},
-        {id:'b_m3', name:'Cat-Cow', desc:'À 4 pattes, alterne dos rond (expire) et dos creusé (inspire). Réchauffe la colonne.', reps:'10 rép. lentes', sec:120, type:'etirement', serieInfo:'10 cycles · 6 s par cycle · synchronisé respiration'},
-        {id:'b_m4', name:'Bird Dog', desc:'Bras et jambe opposée tendus, tiens 3 s. Gainage profond anti-rotation.', reps:'3 × 8', sec:480, type:'gainage', serieInfo:'8 reps/côté alternés · tenu 3 s · retour avant changement'},
-        {id:'b_m5', name:'Pont fessier', desc:'Hanches en l\'air, tiens 3 s. Renforce fessiers et lombaires.', reps:'3 × 10', sec:180, type:'gainage', serieInfo:'10 reps · tenu 3 s · descente lente 2 s'},
+        {id:'b_m1', name:'Respiration diaphragmatique', desc:'Allongé, gonfle le ventre, tiens 5 s. Active le transverse.', reps:'10 souffles', sec:90, type:'gainage', serieInfo:'10 souffles · inspire 4 s · tenu 5 s · expire 6 s', url:'https://www.souffle-et-respire.fr/respiration-diaphragmatique-bienfaits-exercices-guide-complet-2026/'},
+        {id:'b_m2', name:'Knee-to-chest', desc:'Genoux ramenés vers la poitrine, maintiens doucement 30 s. Décompresse les lombaires.', reps:'3 × 30 s', sec:90, type:'etirement', url:'https://www.yogapage.com/apanasana-la-pression-abdominale-fiche-posture/'},
+        {id:'b_m3', name:'Cat-Cow', desc:'À 4 pattes, alterne dos rond (expire) et dos creusé (inspire). Réchauffe la colonne.', reps:'10 rép. lentes', sec:120, type:'etirement', serieInfo:'10 cycles · 6 s par cycle · synchronisé respiration', url:'https://asanas.fr/postures-yoga/chat-marjaryasana'},
+        {id:'b_m4', name:'Bird Dog', desc:'Bras et jambe opposée tendus, tiens 3 s. Gainage profond anti-rotation.', reps:'3 × 8', sec:480, type:'gainage', serieInfo:'8 reps/côté alternés · tenu 3 s · retour avant changement', url:'https://jemeremetsausport.com/bird-dog/'},
+        {id:'b_m5', name:'Pont fessier', desc:'Hanches en l\'air, tiens 3 s. Renforce fessiers et lombaires.', reps:'3 × 10', sec:180, type:'gainage', serieInfo:'10 reps · tenu 3 s · descente lente 2 s', url:'https://jemeremetsausport.com/pont/'},
       ]
     },
     {
@@ -300,10 +302,10 @@ const SESSIONS = {
       id:'soir_bureau', emoji:'🌙', title:'Soir — Décompression lombaire',
       desc:'Après le vélo retour · 15–18 min', duration:'15–18 min',
       exercises:[
-        {id:'b_s1', name:'Étirement psoas (fente basse)', desc:'Genou arrière au sol, avance le bassin. Contre le raccourcissement après vélo + position assise.', reps:'3 × 40 s /côté', sec:240, type:'etirement'},
-        {id:'b_s2', name:'Piriforme figure 4', desc:'Allongé, cheville sur le genou opposé, tire la jambe. Libère hanches et bas du dos.', reps:'2 × 45 s /côté', sec:180, type:'etirement'},
-        {id:'b_s3', name:'Sphinx extension douce', desc:'À plat ventre, avant-bras au sol. Contre les heures en flexion assise.', reps:'3 × 30 s', sec:90, type:'etirement'},
-        {id:'b_s4', name:'Torsion spinale allongée', desc:'Genou plié croisé de l\'autre côté, ouvre les bras en T. Étire toute la chaîne lombaire.', reps:'2 × 45 s /côté', sec:180, type:'etirement'},
+        {id:'b_s1', name:'Étirement psoas (fente basse)', desc:'Genou arrière au sol, avance le bassin. Contre le raccourcissement après vélo + position assise.', reps:'3 × 40 s /côté', sec:240, type:'etirement', url:'https://asanas.fr/postures-yoga/fente-basse-anjaneyasana'},
+        {id:'b_s2', name:'Piriforme figure 4', desc:'Allongé, cheville sur le genou opposé, tire la jambe. Libère hanches et bas du dos.', reps:'2 × 45 s /côté', sec:180, type:'etirement', url:'https://asanas.fr/postures-yoga/pigeon-ardha-kapotasana'},
+        {id:'b_s3', name:'Sphinx extension douce', desc:'À plat ventre, avant-bras au sol. Contre les heures en flexion assise.', reps:'3 × 30 s', sec:90, type:'etirement', url:'https://www.tummee.com/fr/yoga-poses/sphinx-pose'},
+        {id:'b_s4', name:'Torsion spinale allongée', desc:'Genou plié croisé de l\'autre côté, ouvre les bras en T. Étire toute la chaîne lombaire.', reps:'2 × 45 s /côté', sec:180, type:'etirement', url:'https://asanas.fr/postures-yoga/ventre-en-torsion-jathara-parivartanasana'},
       ]
     },
   ],
@@ -313,37 +315,37 @@ const SESSIONS = {
       id:'matin_tele', emoji:'🌅', title:'Matin — Activation & gainage profond',
       desc:'Avant le début du travail · 20–22 min', duration:'20–22 min',
       exercises:[
-        {id:'t_m1', name:'Respiration + activation transverse', desc:'Expire fort, rentre le ventre, tiens 5 s. Active le corset naturel.', reps:'10 souffles', sec:90, type:'gainage', serieInfo:'10 souffles · expire fort · tenu 5 s · relâche 4 s'},
-        {id:'t_m2', name:'Dead Bug', desc:'Bras vers plafond, genoux 90°. Descends bras+jambe opposée. Dos plaqué au sol.', reps:'3 × 8', sec:480, type:'gainage', serieInfo:'8 reps/côté alternés · descente 3 s · remontée 2 s'},
-        {id:'t_m3', name:'Bird Dog', desc:'À 4 pattes, étends bras et jambe opposée. Tiens 3 s. Ne laisse pas le bassin tourner.', reps:'3 × 8', sec:480, type:'gainage', serieInfo:'8 reps/côté alternés · tenu 3 s · contrôlé'},
-        {id:'t_m4', name:'Pont fessier + tenu', desc:'Hanches en l\'air, serre fessiers et abdos. Tiens 3 s. Descends lentement.', reps:'3 × 10', sec:180, type:'gainage', serieInfo:'10 reps · tenu 3 s · descente 2 s'},
-        {id:'t_m5', name:'Planche avant', desc:'Avant-bras, corps aligné, ventre rentré. Respire normalement. Tiens sans apnée.', reps:'3 × 20 s', sec:120, type:'gainage'},
-        {id:'t_m6', name:'Rotation lombaire douce', desc:'Genoux croisés de l\'autre côté, allongé. Décompression avant la journée assise.', reps:'2 × 40 s /côté', sec:160, type:'etirement'},
+        {id:'t_m1', name:'Respiration + activation transverse', desc:'Expire fort, rentre le ventre, tiens 5 s. Active le corset naturel.', reps:'10 souffles', sec:90, type:'gainage', serieInfo:'10 souffles · expire fort · tenu 5 s · relâche 4 s', url:'https://www.souffle-et-respire.fr/respiration-diaphragmatique-bienfaits-exercices-guide-complet-2026/'},
+        {id:'t_m2', name:'Dead Bug', desc:'Bras vers plafond, genoux 90°. Descends bras+jambe opposée. Dos plaqué au sol.', reps:'3 × 8', sec:480, type:'gainage', serieInfo:'8 reps/côté alternés · descente 3 s · remontée 2 s', url:'https://jemeremetsausport.com/dead-bug/'},
+        {id:'t_m3', name:'Bird Dog', desc:'À 4 pattes, étends bras et jambe opposée. Tiens 3 s. Ne laisse pas le bassin tourner.', reps:'3 × 8', sec:480, type:'gainage', serieInfo:'8 reps/côté alternés · tenu 3 s · contrôlé', url:'https://jemeremetsausport.com/bird-dog/'},
+        {id:'t_m4', name:'Pont fessier + tenu', desc:'Hanches en l\'air, serre fessiers et abdos. Tiens 3 s. Descends lentement.', reps:'3 × 10', sec:180, type:'gainage', serieInfo:'10 reps · tenu 3 s · descente 2 s', url:'https://jemeremetsausport.com/pont/'},
+        {id:'t_m5', name:'Planche avant', desc:'Avant-bras, corps aligné, ventre rentré. Respire normalement. Tiens sans apnée.', reps:'3 × 20 s', sec:120, type:'gainage', url:'https://jemeremetsausport.com/exercices-abdominaux-la-planche/'},
+        {id:'t_m6', name:'Rotation lombaire douce', desc:'Genoux croisés de l\'autre côté, allongé. Décompression avant la journée assise.', reps:'2 × 40 s /côté', sec:160, type:'etirement', url:'https://www.coach-hunter.com/exercice/lombaires/etirement-lombaires-2'},
       ]
     },
     {
       id:'midi_tele', emoji:'☀️', title:'Midi — Circuit abdo + activation cardio',
       desc:'Pause déjeuner · sans saut, sans impact · 20–23 min', duration:'20–23 min',
       exercises:[
-        {id:'t_mi1', name:'Step touch dynamique', desc:'Pas latéraux rapides avec bras actifs (ouverture/fermeture en rythme). Cardio sans impact ni saut, silencieux, adapté appartement.', reps:'3 min', sec:180, type:'cardio'},
-        {id:'t_mi2', name:'Crunch bicycle', desc:'Coude vers genou opposé en alternance, lent et contrôlé. Pas de coup de nuque.', reps:'3 × 16', sec:360, type:'gainage', serieInfo:'16 cycles alternés · 2 s par cycle · sans à-coup'},
-        {id:'t_mi3', name:'Hollow Body Hold', desc:'Bras au-dessus de la tête, jambes tendues à 30°. Dos plaqué. Contraction intense.', reps:'4 × 15 s', sec:120, type:'gainage'},
-        {id:'t_mi4', name:'Mountain Climbers sol lent', desc:'Position pompe basse, genoux vers poitrine en alternance très lentement (3 s /jambe). Aucun impact, gainage intense + rythme cardiaque modéré.', reps:'3 × 20 s', sec:120, type:'cardio'},
-        {id:'t_mi5', name:'Side Plank', desc:'Avant-bras, corps aligné de côté, hanches levées. Travaille les obliques.', reps:'3 × 20 s /côté', sec:120, type:'gainage'},
-        {id:'t_mi6', name:'Superman allongé', desc:'À plat ventre, lève bras+jambe opposée. Renforce dos extenseur et fessiers.', reps:'3 × 10 (2 s)', sec:120, type:'gainage', serieInfo:'10 cycles alternés · tenu 2 s en haut · descente contrôlée'},
-        {id:'t_mi7', name:'Étirement hip flexor debout', desc:'En fente, avance le bassin. Contre le raccourcissement par la position assise.', reps:'2 × 30 s /côté', sec:120, type:'etirement'},
+        {id:'t_mi1', name:'Step touch dynamique', desc:'Pas latéraux rapides avec bras actifs (ouverture/fermeture en rythme). Cardio sans impact ni saut, silencieux, adapté appartement.', reps:'3 min', sec:180, type:'cardio', url:'https://www.my15minutechallenge.com/exercices/step-touch/'},
+        {id:'t_mi2', name:'Crunch bicycle', desc:'Coude vers genou opposé en alternance, lent et contrôlé. Pas de coup de nuque.', reps:'3 × 16', sec:360, type:'gainage', serieInfo:'16 cycles alternés · 2 s par cycle · sans à-coup', url:'https://jemeremetsausport.com/crunch-bicycle/'},
+        {id:'t_mi3', name:'Hollow Body Hold', desc:'Bras au-dessus de la tête, jambes tendues à 30°. Dos plaqué. Contraction intense.', reps:'4 × 15 s', sec:120, type:'gainage', url:'https://www.nocsy.fr/mouvements-crossfit/hollow-hold/'},
+        {id:'t_mi4', name:'Mountain Climbers sol lent', desc:'Position pompe basse, genoux vers poitrine en alternance très lentement (3 s /jambe). Aucun impact, gainage intense + rythme cardiaque modéré.', reps:'3 × 20 s', sec:120, type:'cardio', url:'https://www.docteur-fitness.com/mountain-climber'},
+        {id:'t_mi5', name:'Side Plank', desc:'Avant-bras, corps aligné de côté, hanches levées. Travaille les obliques.', reps:'3 × 20 s /côté', sec:120, type:'gainage', url:'https://jemeremetsausport.com/elevations-de-hanches-en-planche-laterale/'},
+        {id:'t_mi6', name:'Superman allongé', desc:'À plat ventre, lève bras+jambe opposée. Renforce dos extenseur et fessiers.', reps:'3 × 10 (2 s)', sec:120, type:'gainage', serieInfo:'10 cycles alternés · tenu 2 s en haut · descente contrôlée', url:'https://jemeremetsausport.com/superman/'},
+        {id:'t_mi7', name:'Étirement hip flexor debout', desc:'En fente, avance le bassin. Contre le raccourcissement par la position assise.', reps:'2 × 30 s /côté', sec:120, type:'etirement', url:'https://asanas.fr/postures-yoga/fente-basse-anjaneyasana'},
       ]
     },
     {
       id:'soir_tele', emoji:'🌙', title:'Soir — Gainage intense + décompression',
       desc:'Fin de journée · 22–25 min', duration:'22–25 min',
       exercises:[
-        {id:'t_s1', name:'Planche dynamique (épaule-épaule)', desc:'En planche, touche l\'épaule opposée en alternance. Anti-rotation des abdos.', reps:'3 × 10 tap', sec:150, type:'gainage', serieInfo:'20 taps alternés · 2 s par tap · hanches stables'},
-        {id:'t_s2', name:'Crunch jambes tendues', desc:'Jambes à 90°, monte les épaules sans balancer. Contracte fort en haut.', reps:'3 × 12', sec:150, type:'gainage', serieInfo:'12 reps · montée 1 s · tenu 1 s · descente 2 s'},
-        {id:'t_s3', name:'Reverse Crunch', desc:'Lève le bassin en ramenant les genoux vers la poitrine. Abdos bas ciblés.', reps:'3 × 12', sec:150, type:'gainage', serieInfo:'12 reps · montée 1 s · descente contrôlée 2 s'},
-        {id:'t_s4', name:'Side Plank avec dip', desc:'Descend et remonte la hanche. Obliques + renfort lombaire.', reps:'3 × 12 /côté', sec:240, type:'gainage', serieInfo:'12 reps/côté · descente 2 s · remontée 1 s'},
-        {id:'t_s5', name:'Dead Bug tempo lent', desc:'Même posture mais 5 s descente / 2 s pause / 3 s remontée. Difficulté par le tempo.', reps:'3 × 6', sec:360, type:'gainage', serieInfo:'6 reps/côté alternés · descente 5 s · pause 2 s · remontée 3 s'},
-        {id:'t_s6', name:'Knee-to-chest + torsion spinale', desc:'Genoux poitrine puis torsion lombaire. Décompression complète.', reps:'2 × 40 s /côté', sec:160, type:'etirement'},
+        {id:'t_s1', name:'Planche dynamique (épaule-épaule)', desc:'En planche, touche l\'épaule opposée en alternance. Anti-rotation des abdos.', reps:'3 × 10 tap', sec:150, type:'gainage', serieInfo:'20 taps alternés · 2 s par tap · hanches stables', url:'https://jemeremetsausport.com/exercices-abdominaux-la-planche/'},
+        {id:'t_s2', name:'Crunch jambes tendues', desc:'Jambes à 90°, monte les épaules sans balancer. Contracte fort en haut.', reps:'3 × 12', sec:150, type:'gainage', serieInfo:'12 reps · montée 1 s · tenu 1 s · descente 2 s', url:'https://jemeremetsausport.com/le-crunch/'},
+        {id:'t_s3', name:'Reverse Crunch', desc:'Lève le bassin en ramenant les genoux vers la poitrine. Abdos bas ciblés.', reps:'3 × 12', sec:150, type:'gainage', serieInfo:'12 reps · montée 1 s · descente contrôlée 2 s', url:'https://jemeremetsausport.com/crunch-inverse/'},
+        {id:'t_s4', name:'Side Plank avec dip', desc:'Descend et remonte la hanche. Obliques + renfort lombaire.', reps:'3 × 12 /côté', sec:240, type:'gainage', serieInfo:'12 reps/côté · descente 2 s · remontée 1 s', url:'https://jemeremetsausport.com/elevations-de-hanches-en-planche-laterale/'},
+        {id:'t_s5', name:'Dead Bug tempo lent', desc:'Même posture mais 5 s descente / 2 s pause / 3 s remontée. Difficulté par le tempo.', reps:'3 × 6', sec:360, type:'gainage', serieInfo:'6 reps/côté alternés · descente 5 s · pause 2 s · remontée 3 s', url:'https://jemeremetsausport.com/dead-bug/'},
+        {id:'t_s6', name:'Knee-to-chest + torsion spinale', desc:'Genoux poitrine puis torsion lombaire. Décompression complète.', reps:'2 × 40 s /côté', sec:160, type:'etirement', url:'https://asanas.fr/postures-yoga/ventre-en-torsion-jathara-parivartanasana'},
       ]
     },
   ],
@@ -356,21 +358,21 @@ const SESSIONS = {
         id:'echauffement_sam', emoji:'🔥', title:'Échauffement général',
         desc:'Activation articulaire + cardio doux · 10 min', duration:'10 min',
         exercises:[
-          {id:'s_e1', name:'Marche sur place genoux hauts', desc:'Lève les genoux à hauteur de bassin en alternance, bras actifs. Monte le rythme cardiaque progressivement.', reps:'2 min', sec:120, type:'cardio'},
-          {id:'s_e2', name:'Cercles épaules avant/arrière', desc:'Bras tendus, grands cercles lents. Mobilise l\'articulation gléno-humérale avant l\'effort.', reps:'10 × chaque sens', sec:60, type:'etirement', serieInfo:'10 cercles avant + 10 arrière · amplitude max · lent'},
-          {id:'s_e3', name:'Rotations hanches debout', desc:'Mains sur les hanches, grands cercles. Chauffe la ceinture lombaire et les fléchisseurs.', reps:'10 × chaque sens', sec:60, type:'etirement', serieInfo:'10 rotations gauche + 10 droite · amplitude max'},
-          {id:'s_e4', name:'Cat-Cow lent', desc:'À 4 pattes, dos rond / dos creusé. Réchauffe toute la colonne avant les charges.', reps:'10 répétitions', sec:90, type:'etirement', serieInfo:'10 cycles · inspire dos creusé · expire dos rond · 5 s/cycle'},
-          {id:'s_e5', name:'Step touch + bras overhead (V)', desc:'Pas latéraux avec bras qui montent en V au-dessus de la tête. Jambes légèrement écartées. Active tout le haut du corps.', reps:'2 min', sec:120, type:'cardio'},
+          {id:'s_e1', name:'Marche sur place genoux hauts', desc:'Lève les genoux à hauteur de bassin en alternance, bras actifs. Monte le rythme cardiaque progressivement.', reps:'2 min', sec:120, type:'cardio', url:'https://jemeremetsausport.com/montees-de-genoux/'},
+          {id:'s_e2', name:'Cercles épaules avant/arrière', desc:'Bras tendus, grands cercles lents. Mobilise l\'articulation gléno-humérale avant l\'effort.', reps:'10 × chaque sens', sec:60, type:'etirement', serieInfo:'10 cercles avant + 10 arrière · amplitude max · lent', url:'https://smartworkout.app/fr/bibliotheque-d-exercices/epaules/cercles-d\'epaules'},
+          {id:'s_e3', name:'Rotations hanches debout', desc:'Mains sur les hanches, grands cercles. Chauffe la ceinture lombaire et les fléchisseurs.', reps:'10 × chaque sens', sec:60, type:'etirement', serieInfo:'10 rotations gauche + 10 droite · amplitude max', url:'https://fitwill.app/fr/exercise/3411/standing-hip-circle/'},
+          {id:'s_e4', name:'Cat-Cow lent', desc:'À 4 pattes, dos rond / dos creusé. Réchauffe toute la colonne avant les charges.', reps:'10 répétitions', sec:90, type:'etirement', serieInfo:'10 cycles · inspire dos creusé · expire dos rond · 5 s/cycle', url:'https://asanas.fr/postures-yoga/chat-marjaryasana'},
+          {id:'s_e5', name:'Step touch + bras overhead (V)', desc:'Pas latéraux avec bras qui montent en V au-dessus de la tête. Jambes légèrement écartées. Active tout le haut du corps.', reps:'2 min', sec:120, type:'cardio', url:'https://www.my15minutechallenge.com/exercices/step-touch/'},
         ]
       },
       {
         id:'gainage_pre_sam', emoji:'🧱', title:'Gainage pré-musculation',
         desc:'Stabilise le dos avant les charges · 15 min', duration:'15 min',
         exercises:[
-          {id:'s_g1', name:'Dead Bug', desc:'Bras vers plafond, genoux 90°. Descends bras+jambe opposée lentement. Dos plaqué. Active les stabilisateurs profonds avant les haltères.', reps:'3 × 8', sec:480, type:'gainage', serieInfo:'8 reps/côté alternés · descente 3 s · remontée 2 s'},
-          {id:'s_g2', name:'Bird Dog', desc:'À 4 pattes, bras et jambe opposée tendus 3 s. Prépare le gainage lombaire pour les exercices debout.', reps:'3 × 8', sec:480, type:'gainage', serieInfo:'8 reps/côté alternés · tenu 3 s · retour contrôlé'},
-          {id:'s_g3', name:'Pont fessier tenu', desc:'Hanches en l\'air, serre fessiers + abdos, tiens 3 s. Active les chaînes postérieures avant le rowing et les développés.', reps:'3 × 10', sec:180, type:'gainage', serieInfo:'10 reps · tenu 3 s · descente 2 s'},
-          {id:'s_g4', name:'Planche avant', desc:'Avant-bras, corps aligné, ventre rentré. Prépare la ceinture abdominale à stabiliser sous charge.', reps:'3 × 20 s', sec:120, type:'gainage'},
+          {id:'s_g1', name:'Dead Bug', desc:'Bras vers plafond, genoux 90°. Descends bras+jambe opposée lentement. Dos plaqué. Active les stabilisateurs profonds avant les haltères.', reps:'3 × 8', sec:480, type:'gainage', serieInfo:'8 reps/côté alternés · descente 3 s · remontée 2 s', url:'https://jemeremetsausport.com/dead-bug/'},
+          {id:'s_g2', name:'Bird Dog', desc:'À 4 pattes, bras et jambe opposée tendus 3 s. Prépare le gainage lombaire pour les exercices debout.', reps:'3 × 8', sec:480, type:'gainage', serieInfo:'8 reps/côté alternés · tenu 3 s · retour contrôlé', url:'https://jemeremetsausport.com/bird-dog/'},
+          {id:'s_g3', name:'Pont fessier tenu', desc:'Hanches en l\'air, serre fessiers + abdos, tiens 3 s. Active les chaînes postérieures avant le rowing et les développés.', reps:'3 × 10', sec:180, type:'gainage', serieInfo:'10 reps · tenu 3 s · descente 2 s', url:'https://jemeremetsausport.com/pont/'},
+          {id:'s_g4', name:'Planche avant', desc:'Avant-bras, corps aligné, ventre rentré. Prépare la ceinture abdominale à stabiliser sous charge.', reps:'3 × 20 s', sec:120, type:'gainage', url:'https://jemeremetsausport.com/exercices-abdominaux-la-planche/'},
         ]
       },
       {
@@ -379,26 +381,26 @@ const SESSIONS = {
         isMuscu: true,
         note:'Débutant / reprise : commencer léger (2 kg par haltère). Augmenter les disques uniquement quand les 12 reps sont fluides sur 3 séries. Repos 60–90 s entre séries.',
         exercises:[
-          {id:'s_mu1', name:'Développé couché à plat (banc)', desc:'Allongé sur le banc à plat, haltères au niveau de la poitrine, coudes à 45°. Pousse vers le haut en expirant. Pectoraux + triceps + épaules avant.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg', serieInfo:'12 reps · 2 kg/bras · montée 1 s · descente 2 s'},
-          {id:'s_mu2', name:'Développé incliné (banc incliné ~30°)', desc:'Banc incliné, même mouvement. Cible le haut des pectoraux et les deltoïdes antérieurs. Charge identique ou légèrement réduite.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg', serieInfo:'12 reps · 2 kg/bras · montée 1 s · descente 2 s'},
-          {id:'s_mu3', name:'Rowing un bras (appui sur banc)', desc:'Genou et main sur le banc, dos horizontal. Tire l\'haltère vers la hanche, coude rasant. Grand dorsal + rhomboïdes + biceps.', reps:'3 × 12 /côté', sec:480, type:'muscu', charge:'1×2 kg', serieInfo:'12 reps/côté · 2 kg · tiré 1 s · tenu 1 s · descente 2 s'},
-          {id:'s_mu4', name:'Élévations latérales debout', desc:'Debout, légèrement penché en avant, jambes écartées. Lève les bras en T jusqu\'à hauteur d\'épaules, descends lentement. Deltoïdes médians.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg', serieInfo:'12 reps · 1 kg/bras · montée 2 s · descente 3 s'},
-          {id:'s_mu5', name:'Curl biceps debout', desc:'Debout, jambes écartées, haltères en supination. Fléchis les coudes sans bouger les épaules. Descends lentement (2 s). Biceps.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg', serieInfo:'12 reps · 2 kg/bras · montée 1 s · tenu 1 s · descente 2 s'},
-          {id:'s_mu6', name:'Extension triceps couché (banc plat)', desc:'Allongé, haltères tendus vers le plafond. Fléchis uniquement les coudes pour descendre les haltères de chaque côté de la tête. Triceps longs.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg', serieInfo:'12 reps · 1 kg/bras · descente 2 s · montée 1 s'},
-          {id:'s_mu7', name:'Oiseau incliné / Reverse fly (banc décliné léger)', desc:'Allongé face vers le bas sur banc légèrement décliné, bras pendants. Lève les bras en T. Trapèzes moyens + deltoïdes postérieurs. Clé pour la posture.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg', serieInfo:'12 reps · 1 kg/bras · montée 2 s · tenu 1 s · descente 2 s'},
-          {id:'s_mu8', name:'Shrugs (haussements d\'épaules)', desc:'Debout jambes écartées, haltères le long du corps. Monte les épaules vers les oreilles, tiens 1 s, descends lentement. Trapèzes supérieurs.', reps:'3 × 12', sec:180, type:'muscu', charge:'2×2 kg', serieInfo:'12 reps · 2 kg/bras · montée 1 s · tenu 1 s · descente 2 s'},
+          {id:'s_mu1', name:'Développé couché à plat (banc)', desc:'Allongé sur le banc à plat, haltères au niveau de la poitrine, coudes à 45°. Pousse vers le haut en expirant. Pectoraux + triceps + épaules avant.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg', serieInfo:'12 reps · 2 kg/bras · montée 1 s · descente 2 s', url:'https://jemeremetsausport.com/developpe-couche/'},
+          {id:'s_mu2', name:'Développé incliné (banc incliné ~30°)', desc:'Banc incliné, même mouvement. Cible le haut des pectoraux et les deltoïdes antérieurs. Charge identique ou légèrement réduite.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg', serieInfo:'12 reps · 2 kg/bras · montée 1 s · descente 2 s', url:'https://jemeremetsausport.com/developpe-incline-avec-halteres/'},
+          {id:'s_mu3', name:'Rowing un bras (appui sur banc)', desc:'Genou et main sur le banc, dos horizontal. Tire l\'haltère vers la hanche, coude rasant. Grand dorsal + rhomboïdes + biceps.', reps:'3 × 12 /côté', sec:480, type:'muscu', charge:'1×2 kg', serieInfo:'12 reps/côté · 2 kg · tiré 1 s · tenu 1 s · descente 2 s', url:'https://jemeremetsausport.com/rowing-haltere-a-un-bras/'},
+          {id:'s_mu4', name:'Élévations latérales debout', desc:'Debout, légèrement penché en avant, jambes écartées. Lève les bras en T jusqu\'à hauteur d\'épaules, descends lentement. Deltoïdes médians.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg', serieInfo:'12 reps · 1 kg/bras · montée 2 s · descente 3 s', url:'https://jemeremetsausport.com/elevations-laterales/'},
+          {id:'s_mu5', name:'Curl biceps debout', desc:'Debout, jambes écartées, haltères en supination. Fléchis les coudes sans bouger les épaules. Descends lentement (2 s). Biceps.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg', serieInfo:'12 reps · 2 kg/bras · montée 1 s · tenu 1 s · descente 2 s', url:'https://jemeremetsausport.com/curl-biceps-alterne-avec-halteres/'},
+          {id:'s_mu6', name:'Extension triceps couché (banc plat)', desc:'Allongé, haltères tendus vers le plafond. Fléchis uniquement les coudes pour descendre les haltères de chaque côté de la tête. Triceps longs.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg', serieInfo:'12 reps · 1 kg/bras · descente 2 s · montée 1 s', url:'https://jemeremetsausport.com/extensions-des-triceps-avec-halteres-en-position-couchee/'},
+          {id:'s_mu7', name:'Oiseau incliné / Reverse fly (banc décliné léger)', desc:'Allongé face vers le bas sur banc légèrement décliné, bras pendants. Lève les bras en T. Trapèzes moyens + deltoïdes postérieurs. Clé pour la posture.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg', serieInfo:'12 reps · 1 kg/bras · montée 2 s · tenu 1 s · descente 2 s', url:'https://jemeremetsausport.com/oiseau-avec-halteres-assis/'},
+          {id:'s_mu8', name:'Shrugs (haussements d\'épaules)', desc:'Debout jambes écartées, haltères le long du corps. Monte les épaules vers les oreilles, tiens 1 s, descends lentement. Trapèzes supérieurs.', reps:'3 × 12', sec:180, type:'muscu', charge:'2×2 kg', serieInfo:'12 reps · 2 kg/bras · montée 1 s · tenu 1 s · descente 2 s', url:'https://jemeremetsausport.com/exercices-epaule-shrugs-halteres/'},
         ]
       },
       {
         id:'gainage_post_sam', emoji:'🧘', title:'Gainage post-effort + étirements',
         desc:'Retour au calme · récupération active · 15–20 min', duration:'15–20 min',
         exercises:[
-          {id:'s_p1', name:'Side Plank statique', desc:'Après l\'effort, le gainage latéral consolide ce que la musculation a travaillé. Corps aligné, hanches levées.', reps:'2 × 20 s /côté', sec:80, type:'gainage', serieInfo:'20 s/côté · respiration régulière'},
-          {id:'s_p2', name:'Étirement pectoraux (angle mur)', desc:'Avant-bras contre un encadrement de porte, penche doucement le thorax vers l\'avant. Ouverture pectorale post-développé.', reps:'2 × 40 s /côté', sec:160, type:'etirement'},
-          {id:'s_p3', name:'Étirement grand dorsal (bras overhead)', desc:'Debout, jambes écartées, agrippe un encadrement ou un mur en hauteur, laisse le poids du corps étirer le côté. Post-rowing.', reps:'2 × 40 s /côté', sec:160, type:'etirement'},
-          {id:'s_p4', name:'Étirement trapèzes (inclinaison latérale tête)', desc:'Assis, penche la tête vers l\'épaule, aide doucement avec la main. Relâche les trapèzes chargés pendant les shrugs.', reps:'2 × 30 s /côté', sec:120, type:'etirement'},
-          {id:'s_p5', name:'Sphinx → Enfant (alternés)', desc:'Alterne sphinx 30 s (extension lombaire) et position de l\'enfant 40 s (flexion décompressive). Contre les heures en flexion post-effort.', reps:'2 × cycle', sec:140, type:'etirement', sets:2, subExos:[{name:'Sphinx',sec:30},{name:'Enfant',sec:40}]},
-          {id:'s_p6', name:'Torsion spinale allongée', desc:'Allongé, genou croisé de l\'autre côté, bras en T. Relâchement final des lombaires et de la chaîne latérale.', reps:'2 × 45 s /côté', sec:180, type:'etirement'},
+          {id:'s_p1', name:'Side Plank statique', desc:'Après l\'effort, le gainage latéral consolide ce que la musculation a travaillé. Corps aligné, hanches levées.', reps:'2 × 20 s /côté', sec:80, type:'gainage', serieInfo:'20 s/côté · respiration régulière', url:'https://jemeremetsausport.com/elevations-de-hanches-en-planche-laterale/'},
+          {id:'s_p2', name:'Étirement pectoraux (angle mur)', desc:'Avant-bras contre un encadrement de porte, penche doucement le thorax vers l\'avant. Ouverture pectorale post-développé.', reps:'2 × 40 s /côté', sec:160, type:'etirement', url:'https://www.stretchingpro.com/etirements-pectoraux/'},
+          {id:'s_p3', name:'Étirement grand dorsal (bras overhead)', desc:'Debout, jambes écartées, agrippe un encadrement ou un mur en hauteur, laisse le poids du corps étirer le côté. Post-rowing.', reps:'2 × 40 s /côté', sec:160, type:'etirement', url:'https://www.stretchingpro.com/etirements-dorsaux/'},
+          {id:'s_p4', name:'Étirement trapèzes (inclinaison latérale tête)', desc:'Assis, penche la tête vers l\'épaule, aide doucement avec la main. Relâche les trapèzes chargés pendant les shrugs.', reps:'2 × 30 s /côté', sec:120, type:'etirement', url:'https://conseilsport.decathlon.fr/etirement-des-trapezes-soulager-et-detendre-le-haut-du-dos'},
+          {id:'s_p5', name:'Sphinx → Enfant (alternés)', desc:'Alterne sphinx 30 s (extension lombaire) et position de l\'enfant 40 s (flexion décompressive). Contre les heures en flexion post-effort.', reps:'2 × cycle', sec:140, type:'etirement', sets:2, subExos:[{name:'Sphinx',sec:30},{name:'Enfant',sec:40}], url:'https://www.tummee.com/fr/yoga-poses/sphinx-pose'},
+          {id:'s_p6', name:'Torsion spinale allongée', desc:'Allongé, genou croisé de l\'autre côté, bras en T. Relâchement final des lombaires et de la chaîne latérale.', reps:'2 × 45 s /côté', sec:180, type:'etirement', url:'https://asanas.fr/postures-yoga/ventre-en-torsion-jathara-parivartanasana'},
         ]
       },
     ],
@@ -410,19 +412,19 @@ const SESSIONS = {
         isYoga: true,
         note:'Toutes les postures ont une alternative plus accessible. Ne force jamais dans la douleur — l\'inconfort doux est normal, la douleur ne l\'est pas. Respire profondément sur chaque posture.',
         exercises:[
-          {id:'d_y1', name:'Respiration ujjayi allongé', desc:'Allongé, genoux fléchis. Inspire 4 s par le nez, expire 6 s lentement. Calme le système nerveux, prépare le corps.', reps:'2 min', sec:120, type:'yoga'},
-          {id:'d_y2', name:'Pawanmuktasana (libération des vents)', desc:'Allongé, ramène un genou vers la poitrine, tiens. Alternative au toucher orteils. Décompresse le bas du dos en douceur.', reps:'3 × 30 s /côté', sec:180, type:'yoga'},
-          {id:'d_y3', name:'Apanasana (deux genoux poitrine)', desc:'Les deux genoux ensemble vers la poitrine, bercement doux gauche-droite. Massage lombaire, accessible quelque soit la souplesse.', reps:'1 min', sec:60, type:'yoga'},
-          {id:'d_y4', name:'Marjariasana / Bitilasana (Cat-Cow yoga)', desc:'À 4 pattes, synchronise le mouvement avec la respiration. Plus lent que la version fitness. Mobilise toute la colonne vertébrale.', reps:'10 cycles lents', sec:120, type:'yoga', serieInfo:'10 cycles · 8 s par cycle · respiration guidée'},
-          {id:'d_y5', name:'Balasana (posture de l\'enfant)', desc:'Genoux écartés à la largeur du tapis, orteils joints, assis sur les talons, bras tendus devant. Écarter les genoux évite la compression abdominale.', reps:'2 × 45 s', sec:90, type:'yoga'},
-          {id:'d_y6', name:'Bhujangasana (cobra bas)', desc:'À plat ventre, mains sous les épaules, lève uniquement le haut du buste avec les muscles du dos (pas les bras). Ouvre les pectoraux et les lombaires.', reps:'3 × 30 s', sec:180, type:'yoga'},
-          {id:'d_y7', name:'Setu Bandha (pont yoga)', desc:'Allongé, pieds à plat, monte les hanches en expirant. Plus long et plus conscient que le pont fitness. Ouvre la poitrine, renforce la chaîne postérieure.', reps:'3 × 40 s', sec:240, type:'yoga'},
-          {id:'d_y8', name:'Supta Matsyendrasana (torsion allongée)', desc:'Allongé, genou fléchi croisé de l\'autre côté, bras en T, regarde à l\'opposé. Torsion douce de toute la colonne. Alternative à la torsion assise qui comprime le ventre.', reps:'2 × 60 s /côté', sec:240, type:'yoga'},
-          {id:'d_y9', name:'Virabhadrasana I modifié (guerrier I)', desc:'Fente avant, pied arrière à 45°, bras levés en V (jambes légèrement écartées). Ouvre hanches + psoas + épaules simultanément.', reps:'2 × 40 s /côté', sec:160, type:'yoga'},
-          {id:'d_y10', name:'Trikonasana (triangle) version mur', desc:'Debout, pieds écartés, main sur la cuisse ou le tibia (pas le sol), autre bras vers le plafond. La main sur la jambe évite la flexion profonde et la compression abdominale.', reps:'2 × 40 s /côté', sec:160, type:'yoga'},
-          {id:'d_y11', name:'Vrksasana (arbre) bras en V', desc:'Debout, pied en appui sur le mollet ou la cuisse intérieure. Bras levés en V, jambes légèrement écartées. Équilibre + concentration + ouverture des hanches.', reps:'2 × 30 s /côté', sec:120, type:'yoga'},
-          {id:'d_y12', name:'Viparita Karani (jambes au mur)', desc:'Allongé, fesses proches du mur, jambes tendues vers le haut. Drainage veineux post-semaine de vélo. Relâchement lombaire passif.', reps:'3 min', sec:180, type:'yoga'},
-          {id:'d_y13', name:'Savasana (relaxation finale)', desc:'Allongé, bras légèrement écartés du corps, yeux fermés. Scan corporel de la tête aux pieds. Intègre les bénéfices de la séance.', reps:'5 min', sec:300, type:'yoga'},
+          {id:'d_y1', name:'Respiration ujjayi allongé', desc:'Allongé, genoux fléchis. Inspire 4 s par le nez, expire 6 s lentement. Calme le système nerveux, prépare le corps.', reps:'2 min', sec:120, type:'yoga', url:'https://www.yogom.fr/respiration-ujjayi/'},
+          {id:'d_y2', name:'Pawanmuktasana (libération des vents)', desc:'Allongé, ramène un genou vers la poitrine, tiens. Alternative au toucher orteils. Décompresse le bas du dos en douceur.', reps:'3 × 30 s /côté', sec:180, type:'yoga', url:'https://asanas.fr/postures-yoga/liberation-des-vents-pavanamuktasana'},
+          {id:'d_y3', name:'Apanasana (deux genoux poitrine)', desc:'Les deux genoux ensemble vers la poitrine, bercement doux gauche-droite. Massage lombaire, accessible quelque soit la souplesse.', reps:'1 min', sec:60, type:'yoga', url:'https://www.yogapage.com/apanasana-la-pression-abdominale-fiche-posture/'},
+          {id:'d_y4', name:'Marjariasana / Bitilasana (Cat-Cow yoga)', desc:'À 4 pattes, synchronise le mouvement avec la respiration. Plus lent que la version fitness. Mobilise toute la colonne vertébrale.', reps:'10 cycles lents', sec:120, type:'yoga', serieInfo:'10 cycles · 8 s par cycle · respiration guidée', url:'https://asanas.fr/postures-yoga/chat-marjaryasana'},
+          {id:'d_y5', name:'Balasana (posture de l\'enfant)', desc:'Genoux écartés à la largeur du tapis, orteils joints, assis sur les talons, bras tendus devant. Écarter les genoux évite la compression abdominale.', reps:'2 × 45 s', sec:90, type:'yoga', url:'https://asanas.fr/postures-yoga/enfant-balasana'},
+          {id:'d_y6', name:'Bhujangasana (cobra bas)', desc:'À plat ventre, mains sous les épaules, lève uniquement le haut du buste avec les muscles du dos (pas les bras). Ouvre les pectoraux et les lombaires.', reps:'3 × 30 s', sec:180, type:'yoga', url:'https://asanas.fr/postures-yoga/cobra-bhujangasana'},
+          {id:'d_y7', name:'Setu Bandha (pont yoga)', desc:'Allongé, pieds à plat, monte les hanches en expirant. Plus long et plus conscient que le pont fitness. Ouvre la poitrine, renforce la chaîne postérieure.', reps:'3 × 40 s', sec:240, type:'yoga', url:'https://asanas.fr/postures-yoga/demi-pont-ardha-setu-bandhasana'},
+          {id:'d_y8', name:'Supta Matsyendrasana (torsion allongée)', desc:'Allongé, genou fléchi croisé de l\'autre côté, bras en T, regarde à l\'opposé. Torsion douce de toute la colonne. Alternative à la torsion assise qui comprime le ventre.', reps:'2 × 60 s /côté', sec:240, type:'yoga', url:'https://asanas.fr/postures-yoga/ventre-en-torsion-jathara-parivartanasana'},
+          {id:'d_y9', name:'Virabhadrasana I modifié (guerrier I)', desc:'Fente avant, pied arrière à 45°, bras levés en V (jambes légèrement écartées). Ouvre hanches + psoas + épaules simultanément.', reps:'2 × 40 s /côté', sec:160, type:'yoga', url:'https://asanas.fr/postures-yoga/guerrier-1-virabhadrasana-1'},
+          {id:'d_y10', name:'Trikonasana (triangle) version mur', desc:'Debout, pieds écartés, main sur la cuisse ou le tibia (pas le sol), autre bras vers le plafond. La main sur la jambe évite la flexion profonde et la compression abdominale.', reps:'2 × 40 s /côté', sec:160, type:'yoga', url:'https://asanas.fr/postures-yoga/triangle-utthita-trikonasana'},
+          {id:'d_y11', name:'Vrksasana (arbre) bras en V', desc:'Debout, pied en appui sur le mollet ou la cuisse intérieure. Bras levés en V, jambes légèrement écartées. Équilibre + concentration + ouverture des hanches.', reps:'2 × 30 s /côté', sec:120, type:'yoga', url:'https://asanas.fr/postures-yoga/arbre-vrksasana'},
+          {id:'d_y12', name:'Viparita Karani (jambes au mur)', desc:'Allongé, fesses proches du mur, jambes tendues vers le haut. Drainage veineux post-semaine de vélo. Relâchement lombaire passif.', reps:'3 min', sec:180, type:'yoga', url:'https://yogalisa.fr/position-yoga-jambes-en-l-air/'},
+          {id:'d_y13', name:'Savasana (relaxation finale)', desc:'Allongé, bras légèrement écartés du corps, yeux fermés. Scan corporel de la tête aux pieds. Intègre les bénéfices de la séance.', reps:'5 min', sec:300, type:'yoga', url:'https://asanas.fr/postures-yoga/cadavre-savasana'},
         ]
       },
     ],
@@ -836,7 +838,7 @@ function renderDayPanel(day) {
           return `<div class="ex-item${exCollapsed?' collapsed':''}" id="exitem_${day.id}_${ex.id}"><div class="ex-row ${checked}" id="exrow_${day.id}_${ex.id}" onclick="toggleExCollapse(event,'${day.id}','${ex.id}')">
                 <button type="button" class="ex-check" onclick="event.stopPropagation();toggleEx('${day.id}','${ex.id}','${s.id}')">${checked?'✓':''}</button>
                 <div class="ex-body">
-                  <div class="ex-name">${i+1}. ${ex.name}</div>
+                  <div class="ex-name">${i+1}. ${ex.name}${ex.url ? `<a class="ex-info-link" href="${ex.url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Fiche technique">↗</a>` : ''}</div>
                   <div class="ex-desc">${ex.desc}</div>
                 </div>
                 <div class="ex-right">
