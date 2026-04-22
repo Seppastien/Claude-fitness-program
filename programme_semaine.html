@@ -190,8 +190,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .serie-timer-btn{border:1px solid var(--border2);background:none;border-radius:16px;padding:2px 8px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;color:var(--muted);display:flex;align-items:center;gap:4px;white-space:nowrap;transition:all .15s}
 .serie-timer-btn:hover{border-color:var(--text);color:var(--text)}
 .serie-timer-btn.running{border-color:var(--red);color:var(--red)}
-.serie-timer-btn.rest{border-color:var(--gold);color:var(--gold)}
-.serie-timer-btn.rest.running{border-color:var(--gold);color:var(--gold);background:rgba(201,151,26,.08)}
+.serie-timer-btn.rest{border-color:var(--green);color:var(--green)}
+.serie-timer-btn.rest.running{border-color:var(--green);color:var(--green);background:rgba(46,125,82,.08)}
 .serie-phase{font-size:10px;color:var(--muted);font-style:italic;flex:1;text-align:right}
 .serie-phase.active-phase{color:var(--tele)}
 
@@ -289,9 +289,10 @@ body:not(.admin-mode) .admin-container{display:none}
 .tm-phase{font-size:11px;color:var(--muted);font-weight:500;margin-bottom:4px;text-transform:uppercase;letter-spacing:.8px}
 .tm-phase.prep{color:var(--bureau)}
 .tm-phase.work{color:var(--tele)}
-.tm-phase.rest{color:var(--gold)}
+.tm-phase.rest{color:var(--green)}
 .tm-time{font-family:'DM Mono',monospace;font-size:64px;font-weight:600;line-height:1.05;letter-spacing:-2px;color:var(--text);margin-bottom:20px;transition:color .2s,font-size .15s}
 .tm-time.big{font-size:96px;color:var(--bureau)}
+.tm-time.rest{color:var(--green)}
 .tm-time.paused{opacity:.45}
 .tm-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 .tm-btn{padding:10px 14px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--text);font-size:12.5px;font-family:inherit;font-weight:500;cursor:pointer;transition:all .15s;flex:1;min-width:96px;display:inline-flex;align-items:center;justify-content:center;gap:4px}
@@ -1547,6 +1548,7 @@ function updateTimerModal(sid, phaseType, remaining) {
     phaseEl.className = 'tm-phase ' + phaseType;
   }
   if (timeEl) {
+    timeEl.classList.toggle('rest', phaseType === 'rest');
     if (phaseType === 'prep') {
       timeEl.classList.add('big');
       timeEl.textContent = String(Math.max(0, remaining));
