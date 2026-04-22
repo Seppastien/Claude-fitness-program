@@ -341,8 +341,7 @@ body.admin-mode .timer-modal{display:none !important}
 <!-- ── Panneaux jour (générés par renderAllPanels) ── -->
 <div class="day-panels" id="day-panels"></div>
 
-<!-- ── Mode admin : éditeur de configuration (caché par défaut) ── -->
-<!-- ── Modale timer série (mode utilisateur) ── -->
+<!-- ── Modale timer plein écran (visible pendant chaque série en durée, masquée en mode admin) ── -->
 <div class="timer-modal hidden" id="timer-modal" aria-hidden="true" role="dialog">
   <div class="timer-modal-content">
     <div class="tm-ex-name" id="tm-ex-name"></div>
@@ -361,6 +360,7 @@ body.admin-mode .timer-modal{display:none !important}
   </div>
 </div>
 
+<!-- ── Mode admin : éditeur de configuration (affiché quand body.admin-mode est actif) ── -->
 <div class="admin-container" id="admin-container">
   <div class="admin-banner">
     <span>⚠️ Mode édition — modifications sauvegardées automatiquement</span>
@@ -384,8 +384,11 @@ body.admin-mode .timer-modal{display:none !important}
 // ╔══════════════════════════════════════════════╗
 // ║  DATA — Constantes & définitions sessions    ║
 // ╚══════════════════════════════════════════════╝
-// Structure : DAYS, TYPE_LABELS, SESSIONS { bureau, tele, weekend }
-// Voir CLAUDE.md §"Structure des données SESSIONS" pour le schéma complet
+// DAYS / TYPE_LABELS / TYPE_COLORS / SESSIONS sont les valeurs livrées par
+// défaut. Elles servent de seed à DEFAULT_CONFIG (section CONFIG ci-dessous),
+// qui est elle-même la cible du bouton Reset et le point d'entrée du clone
+// vers LIVE_CONFIG. Toutes les fonctions de rendu lisent LIVE_CONFIG, PAS
+// ces constantes directement — voir CLAUDE.md §"Structure des données SESSIONS".
 
 const DAYS = [
   { id:'lun', label:'Lun', fullName:'Lundi', type:'bureau' },
@@ -568,10 +571,15 @@ const SESSIONS = {
 // ╚══════════════════════════════════════════════╝
 // DEFAULT_CONFIG : source de vérité figée (les DAYS/TYPE_*/SESSIONS ci-dessus).
 //                  Sert de seed au premier lancement et cible du bouton Reset.
-// LIVE_CONFIG    : config active lue par toutes les fonctions de rendu.
-//                  Initialisée à un clone de DEFAULT_CONFIG, remplacée par
-//                  loadConfig() au démarrage si une config utilisateur existe.
-// Persistance    : localStorage clé 'fitness_config' (Drive ajouté en tranche 2).
+// LIVE_CONFIG    : config active lue par toutes les fonctions de rendu et par
+//                  le mode admin. Initialisée à un clone de DEFAULT_CONFIG,
+//                  remplacée par loadConfig() au boot si une config utilisateur
+//                  est trouvée en localStorage, puis éventuellement écrasée par
+//                  loadConfigFromDrive() si le fichier Drive est plus à jour.
+// Persistance    : double — localStorage (clé CONFIG_STORAGE_KEY) + Google Drive
+//                  (fichier fitness_programme_config.json, debounce 2 s).
+// Validation     : isValidConfig() — toute config (locale, Drive, importée) doit
+//                  passer cette garde avant d'écraser LIVE_CONFIG.
 
 const DEFAULT_CONFIG = {
   version: 1,
@@ -626,9 +634,14 @@ function loadConfig() {
 // ║  STATE — Variables globales & helpers date   ║
 // ╚══════════════════════════════════════════════╝
 // currentWeekOffset : décalage en semaines par rapport à aujourd'hui (0 = semaine courante)
-// activeDay         : id du jour affiché (ex: 'lun', 'mar'...)
-// timers            : réservé (non utilisé activement, conservé pour compatibilité)
-// serieTimers       : map sid → { interval, remaining, phase } pour chaque série en cours
+// activeDay         : id du jour affiché (ex: 'lun', 'mar'…)
+// timers            : map legacy, réservée (aucun consommateur actif — conservée
+//                     pour compatibilité si un onclick HTML ancien en fait encore usage)
+// serieTimers       : map sid → { interval, remaining, phase:'prep'|'work'|'rest',
+//                     paused, secPerSet, restSec, serieIdx, totalSets }.
+//                     Voir startSerieTimer/tickSerieTimer pour le cycle de vie.
+// adminState        : déclaré plus bas dans la section ADMIN MODE.
+// modalState        : déclaré plus bas dans la section TIMER MODAL.
 let currentWeekOffset = 0;
 let activeDay = 'lun';
 const timers = {};
@@ -661,15 +674,20 @@ function getWeekNumber(d) {
 // ╔══════════════════════════════════════════════╗
 // ║  GOOGLE DRIVE — OAuth2 & persistance         ║
 // ╚══════════════════════════════════════════════╝
-// Flux : initGoogleAuth → tryRestoreToken → loadFromDrive (progress + config)
-// Fallback localStorage si non connecté
-// Deux fichiers Drive :
-//   fitness_programme_semaine.json → progression (checks, journal) — volatile
-//   fitness_programme_config.json  → config utilisateur (days, sessions)  — rare
-// Scope : drive.file
+// Flux : initGoogleAuth → tryRestoreToken → loadFromDrive (config puis progression).
+// Fallback localStorage si non connecté ou hors ligne.
+// Deux fichiers Drive, tous deux au scope drive.file (accès restreint aux seuls
+// fichiers créés par l'app — pas de lecture du reste du Drive utilisateur) :
+//   fitness_programme_semaine.json → progression (checks + journal par semaine),
+//                                    écrite après chaque action utilisateur
+//                                    (debounce 2 s via scheduleSave).
+//   fitness_programme_config.json  → configuration (days, typeLabels, sessions…),
+//                                    écrite à chaque édition admin / import / reset
+//                                    (debounce 2 s via scheduleSaveConfig).
 
 // ── Config & état Drive ──
-// ⚙️ REMPLACE PAR TON CLIENT ID GOOGLE CLOUD
+// Client ID OAuth Google Cloud — si tu forkes le projet, remplace cette valeur par
+// l'ID du projet Google Cloud que tu as créé (voir README §"Configuration Google Drive").
 const GOOGLE_CLIENT_ID = '32795966086-3kt7ddob947h1bsahsmfom1qlmtkucea.apps.googleusercontent.com';
 const DRIVE_FILENAME = 'fitness_programme_semaine.json';
 const DRIVE_CONFIG_FILENAME = 'fitness_programme_config.json';
@@ -867,8 +885,11 @@ function scheduleSaveConfig() {
   driveState.configSaveTimer = setTimeout(() => { if (driveState.connected) saveConfigToDrive(); }, 2000);
 }
 
-// API publique : persiste la config dans LIVE_CONFIG + localStorage, et schedule Drive si connecté.
-// L'admin UI (tranches 3/4) appellera cette fonction après chaque édition.
+// API publique : valide via isValidConfig, met à jour meta.lastModified, remplace
+// LIVE_CONFIG, miroir immédiat en localStorage, puis planifie l'upload Drive
+// (debounce 2 s). Appelée par tout le mode admin après chaque édition/import/reset.
+// `source` trace l'origine ('user' par défaut, 'import' après chargement JSON,
+// 'default' après un Reset).
 function saveConfig(newConfig, source) {
   if (!isValidConfig(newConfig)) { console.warn('saveConfig: config invalide, ignorée'); return false; }
   newConfig.meta = newConfig.meta || {};
@@ -927,8 +948,15 @@ function saveJournal(dayId, journal) {
 // ╔══════════════════════════════════════════════╗
 // ║  RENDER — Génération du DOM                  ║
 // ╚══════════════════════════════════════════════╝
-// getSessionsForDay, countExercises, renderOverview,
-// renderTabs, switchDay, renderAllPanels, renderDayPanel
+// getSessionsForDay  → délègue à LIVE_CONFIG.sessions (jamais de constante figée)
+// countExercises     → total / done par jour (alimente overview + onglets)
+// renderOverview     → anneaux de progression hebdo dans la topbar
+// renderTabs         → onglets jours avec compteur done/total
+// switchDay          → change le jour actif + scroll tab
+// renderAllPanels    → rend tous les panneaux et restaure l'état visuel des séries
+// renderDayPanel     → panneau complet (stats, sessions, journal) pour un jour
+// Logique d'ouverture auto : la 1re session incomplète après la dernière
+// terminée reste dépliée, les autres sont collapsed (cf CLAUDE.md).
 
 // ── Helpers & utilitaires de rendu ──
 function getSessionsForDay(dayId) {
@@ -1170,8 +1198,15 @@ function renderDayPanel(day) {
 // ╔══════════════════════════════════════════════╗
 // ║  INTERACTIONS — Handlers utilisateur         ║
 // ╚══════════════════════════════════════════════╝
-// toggleEx, toggleVelo, setStar, setFeeling, saveJournalEntry
+// toggleEx       → case principale d'un exercice (sync → toutes les séries)
+// toggleVelo     → case d'une direction vélo (aller / retour)
+// toggleSerieCheck / repSerieCheck / syncExValidation → cases série (durée / reps)
+// setStar / setFeeling / saveJournalEntry → journal quotidien (note, ressenti, texte)
+// updateSessionBadge / updateTabCount     → badges de progression par session / jour
 
+// Historique : les events étaient initialement bindés ici ; aujourd'hui les
+// gestionnaires sont inline (onclick="…") dans le HTML généré par renderDayPanel,
+// donc ce bind est un no-op conservé pour extension future.
 function bindDayEvents(dayId, panel) { /* events are inline for simplicity */ }
 
 // toggleEx : case principale de l'exercice (non via les séries).
@@ -1271,11 +1306,17 @@ function saveJournalEntry(dayId) {
 // ╔══════════════════════════════════════════════╗
 // ║  TIMERS & SERIES TRACKER                     ║
 // ╚══════════════════════════════════════════════╝
-// isDurationEx  → détecte durée vs reps
-// renderSeriesTracker → durée simple ou /côté
-// renderRepTracker    → reps simple ou /côté
-// renderSubExoTracker → subExos (ex: Sphinx→Enfant)
-// startSerieTimer     → Web Audio + countdown
+// isDurationEx           → détecte durée vs reps (regex \d+\s*s|min sur ex.reps)
+// parseReps/parseRepSets → deux parseurs distincts (durée vs reps), doc CLAUDE.md
+// renderSeriesTracker    → trackers pour exercices en durée (simple ou /côté)
+// renderRepTracker       → trackers pour exercices en reps (simple ou /côté)
+// renderSubExoTracker    → trackers pour exercices combinés (Sphinx→Enfant)
+// repSerieCheck          → case série reps (3 états : cocher, annuler repos, décocher)
+// beep* / playExerciseCompleteSound → Web Audio API (phases + fanfares fin)
+// startSerieTimer + tickSerieTimer + transitionToWork + finishWorkPhase +
+//   finishRestPhase + resetSerieTimer → cycle 3 phases prep→work→rest
+// openTimerModal + closeTimerModal + updateTimerModal + pauseModalTimer +
+//   skipModalTimer + resetModalTimer → modale plein écran liée au timer actif
 
 function fmtTime(s) {
   return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
@@ -1536,11 +1577,19 @@ function repSerieCheck(sid, restSec, isLast) {
 }
 
 // ── Series timer state ──
+// Map sid → état courant d'un timer de série en durée. Forme par entrée :
+//   { interval, remaining, phase:'prep'|'work'|'rest', paused,
+//     secPerSet, restSec, serieIdx, totalSets }
+// Un sid absent ou à null = timer non démarré (ou déjà terminé/reset).
 const serieTimers = {};
 
 // ── TIMER MODAL (overlay plein écran affiché pendant une série en durée) ──
 // Affiche résumé exercice/série, numéro de série, temps restant, et expose
-// 3 actions utilisateur : pause/reprise, saut (valide la série), reset.
+// 3 actions utilisateur : pause/reprise, saut (valide la série en work),
+// reset (annule la série, ne valide pas). Un seul timer peut être actif ;
+// modalState trace le sid courant pour ignorer tout update provenant
+// d'un autre tracker encore en vie.
+// PREP_SECS : phase de préparation avant chaque série (bip à chaque seconde).
 const PREP_SECS = 3;
 const modalState = { sid: null, active: false };
 
@@ -1869,7 +1918,9 @@ function toggleSerieCheck(sid) {
   syncExValidation(chk);
 }
 
-// toggleTimer : stub conservé pour éviter des erreurs si un ancien onclick en HTML y fait référence
+// toggleTimer : stub no-op conservé par sécurité — l'ancien timer global a été
+// remplacé par startSerieTimer (par série), mais cette fonction reste déclarée
+// au cas où un onclick généré ou une version en cache de l'app l'invoque encore.
 function toggleTimer(id, total) {}
 
 // renderSubExoTracker : pour les exercices avec subExos (ex: Sphinx→Enfant).
@@ -1940,19 +1991,31 @@ function updateWeekDisplay() {
 // ╔══════════════════════════════════════════════╗
 // ║  ADMIN MODE — Éditeur de configuration       ║
 // ╚══════════════════════════════════════════════╝
-// Activation : bouton ⚙ dans la topbar → toggleAdminMode().
-// Arbre gauche : jours → sessions → exercices. Éditeur droit : formulaire
-// contextuel selon la sélection. Chaque modification appelle saveConfig(LIVE_CONFIG)
-// → localStorage immédiat + scheduleSaveConfig Drive (debounce 2 s).
-// v1 : édition de champs basiques + CRUD + réordonnancement ↑↓.
-// v2 (tranche 4) : éditeur reps intelligent, subExos, veloStats, import/export, reset.
+// Activation : bouton ⚙ dans la topbar → toggleAdminMode() (ajoute body.admin-mode).
+// Layout : arbre gauche (jours → sessions → exercices) + éditeur droit (formulaire
+//   contextuel selon la sélection). Pas de bouton "Sauvegarder" — chaque saisie
+//   appelle saveConfig(LIVE_CONFIG) qui écrit localStorage immédiatement et
+//   planifie l'upload Drive (debounce 2 s).
+// Fonctionnalités : édition de tous les champs d'un exercice (nom, desc, reps,
+//   sec, charge, type, serieInfo, url, subExos, veloStats), CRUD sessions +
+//   exercices, réordonnancement ↑↓, duplication, builder reps (mode reps/durée
+//   + latéralité + aperçu) avec bascule mode libre, conversion simple↔combiné,
+//   export/import JSON, reset vers DEFAULT_CONFIG.
 
+// adminState : état de l'UI admin (hors LIVE_CONFIG).
+//   active       → true quand body.admin-mode est posé
+//   selected     → { kind:'day'|'session'|'exercise', dayId, sessionId?, exerciseId? }
+//   expanded     → Set de clés pour l'arbre (dayId ou dayId+'::'+sessionId)
+//   repsFreeMode → true si l'utilisateur a forcé le mode libre sur le builder reps
 let adminState = {
   active: false,
-  selected: null,      // { kind:'day'|'session'|'exercise', dayId, sessionId?, exerciseId? }
-  expanded: new Set()  // clés : dayId | dayId+'::'+sessionId
+  selected: null,
+  expanded: new Set()
 };
 
+// Bascule entre mode utilisateur et mode admin. À la sortie du mode admin,
+// le planning est entièrement re-rendu pour refléter d'éventuelles modifications
+// de LIVE_CONFIG (ajout/suppression d'exercices, changements de reps, etc.).
 function toggleAdminMode() {
   adminState.active = !adminState.active;
   document.body.classList.toggle('admin-mode', adminState.active);
@@ -2464,6 +2527,10 @@ function adminSubExoUpdate(idx, field, value) {
   saveConfig(LIVE_CONFIG);
 }
 
+// Point d'entrée unique des éditions de champs "classiques" (data-field).
+// Aiguille sur la bonne cible (day / session / exercise) via adminState.selected,
+// gère les chemins pointés ("veloStats.km"), les conversions num (sec/sets) et les
+// flags booléens (isVelo → initialise veloStats/veloDir et retire exercises).
 function adminApplyFieldEdit(field, value) {
   const s = adminState.selected;
   if (!s) return;
@@ -2498,6 +2565,9 @@ function adminApplyFieldEdit(field, value) {
   saveConfig(LIVE_CONFIG);
 }
 
+// Appelée après un changement du `type` d'un jour (ex: bureau → weekend) :
+// garantit l'existence du bucket sessions correspondant dans LIVE_CONFIG pour
+// que le jour édité puisse recevoir des sessions.
 function ensureSessionsArrayForDay(dayId) {
   const day = LIVE_CONFIG.days.find(d => d.id === dayId);
   if (!day) return;
@@ -2683,9 +2753,18 @@ function adminResetConfig() {
 // ╔══════════════════════════════════════════════╗
 // ║  INIT — Point d'entrée                       ║
 // ╚══════════════════════════════════════════════╝
-// Détecte le jour courant, charge les données, rend l'UI.
-// tryRestoreToken est différé à 800 ms pour laisser le temps à la lib Google de charger.
-// dayMap convertit getDay() (0=dim) vers l'index dans DAYS (0=lun..6=dim).
+// Ordre d'exécution au boot :
+//   1. loadConfig() — hydrate LIVE_CONFIG depuis localStorage (ou DEFAULT_CONFIG).
+//      DOIT précéder tout rendu : tout le rendu lit LIVE_CONFIG.
+//   2. Détection du jour courant (getDay() → index LIVE_CONFIG.days via dayMap :
+//      JS Sunday=0 → index 6 (dim), Monday=1 → 0 (lun), etc.).
+//   3. Rendu de l'UI (panneaux, onglets, overview) + bind des events admin.
+//   4. Différé 800 ms : tryRestoreToken() — laisse la lib Google (gsi/client)
+//      finir son chargement ; si un token valide existe en localStorage,
+//      loadFromDrive() peut écraser LIVE_CONFIG (config Drive prioritaire) et
+//      fusionner la progression.
+//   5. Wake Lock : demande l'empêchement de la mise en veille, re-demandé à
+//      chaque retour de visibilité (onglet réactivé).
 
 (function init() {
   loadConfig(); // Doit précéder tout rendu : LIVE_CONFIG est la source de vérité.

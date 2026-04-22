@@ -123,7 +123,7 @@ Puis : **⋮ → Ajouter à l'écran d'accueil** pour créer un raccourci applic
 5. Le Client ID est déjà intégré dans le fichier HTML
 6. Au premier lancement, cliquer **Connecter Drive** dans la barre de statut
 
-Les données sont stockées uniquement dans `fitness_programme_semaine.json` sur Drive (scope `drive.file` restreint — aucun accès aux autres fichiers).
+Les données sont stockées dans deux fichiers Drive créés par l'app (`fitness_programme_semaine.json` pour la progression, `fitness_programme_config.json` pour la configuration éditable). Le scope `drive.file` restreint l'accès à ces fichiers-là — l'app ne peut rien lire d'autre dans ton Drive.
 
 ## Mise à jour du fichier
 
@@ -135,9 +135,9 @@ GitHub Pages se met à jour automatiquement en 1–2 minutes.
 
 ## Stack technique
 
-- HTML / CSS / JavaScript vanilla — aucune dépendance externe
-- Web Audio API pour les bips
+- HTML / CSS / JavaScript vanilla — aucune dépendance externe, un seul fichier
+- Web Audio API pour les bips de phases et les fanfares de fin (exercice / séance / journée complète)
 - Screen Wake Lock API pour empêcher la mise en veille de l'écran pendant une séance
-- Google Identity Services (OAuth 2.0)
-- Google Drive API v3
-- localStorage comme cache local et fallback offline
+- Google Identity Services (OAuth 2.0) avec restauration de session silencieuse
+- Google Drive API v3 (scope `drive.file` — accès restreint aux fichiers créés par l'app)
+- localStorage comme cache local, miroir de config et fallback offline

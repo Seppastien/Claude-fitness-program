@@ -50,7 +50,9 @@
       "Bash(git -C C:/GameDev/Claude-fitness-program log --oneline -1 f8ecd9a)",
       "Bash(git -C C:/GameDev/Claude-fitness-program show f8ecd9a --stat)",
       "Bash(git -C C:/GameDev/Claude-fitness-program diff HEAD~1 HEAD -- programme_semaine.html)",
-      "Bash(git -C C:/GameDev/Claude-fitness-program log --oneline -20)"
+      "Bash(git -C C:/GameDev/Claude-fitness-program log --oneline -20)",
+      "Bash(grep -n \"^\\\\s*//\\\\|^\\\\s*/\\\\*\\\\|\\\\*/$\\\\|<!--\" C:/GameDev/Claude-fitness-program/programme_semaine.html)",
+      "Bash(git -C C:/GameDev/Claude-fitness-program diff --stat HEAD)"
     ]
   }
 }

@@ -152,14 +152,30 @@ Le champ `sec` représente toujours la **durée totale** de l'exercice, tous cô
 
 ## Système audio (Web Audio API)
 
+### Bips de phase (exercices en durée)
+
 ```javascript
-beepStart()   // 880 Hz aigu court      — début de série
-beepHalf()    // 660 Hz double médium   — mi-temps
-beepEnd()     // 440 Hz triple grave    — fin de série
+beepStart()   // 880 Hz aigu court      — début de série (+ tick chaque seconde en phase prep)
+beepHalf()    // 660 Hz double médium   — mi-temps de la phase work
+beepEnd()     // 440 Hz triple grave    — fin de la phase work
 beepRestEnd() // 880→1100 Hz montant    — fin du temps de repos
 ```
 
-Les bips sont déclenchés uniquement sur les exercices en durée (`isDurationEx`). Les exercices en reps déclenchent uniquement `beepEnd()` au clic de validation et `beepRestEnd()` en fin de repos.
+### Fanfares de fin (arpèges victorieux)
+
+Jouées à la validation du **dernier** exercice d'une granularité donnée. `playExerciseCompleteSound(chk)` choisit automatiquement la fanfare en fonction de l'état global du jour :
+
+```javascript
+beepExerciseDone() // C-E-G-C        — fin d'un exercice (cas par défaut)
+beepSessionDone()  // escalier + C maj — dernier exercice d'une séance
+beepDayDone()      // grande fanfare + accord soutenu — dernier exercice du jour
+```
+
+### Règles
+
+- Les bips de phase ne concernent **que** les exercices en durée (`isDurationEx(ex)`).
+- Les exercices en reps déclenchent `beepEnd()` à la validation d'une série et `beepRestEnd()` en fin de repos.
+- `playExerciseCompleteSound` est appelée par `syncExValidation` quand toutes les séries d'un exercice passent à `done` — elle doit toujours être le point unique qui décide de la fanfare.
 
 ---
 
@@ -441,6 +457,21 @@ Activé par `toggleAdminMode()` (bouton ⚙ en topbar). Ajoute `body.admin-mode`
 | `{dayId}_{exId}_s{i}_sub{j}` | SubExo (exercice combiné) |
 
 Ces IDs sont utilisés comme clés dans l'objet `serieTimers` et comme suffixes des éléments DOM `schk_`, `stbtn_`, `stdisp_`, `sphase_`, `srow_`.
+
+---
+
+## Ordre d'exécution au boot (fonction `init`)
+
+Tout se joue dans l'IIFE `(function init(){…})()` à la fin du `<script>` :
+
+1. **`loadConfig()`** — hydrate `LIVE_CONFIG` depuis `localStorage` (ou `cloneDefaultConfig()` en fallback). DOIT précéder tout rendu : les fonctions de rendu lisent `LIVE_CONFIG`, pas les constantes figées.
+2. **Détection du jour courant** — `getDay()` (JS : 0=dim) est remappé via `dayMap = [6,0,1,2,3,4,5]` vers l'index dans `LIVE_CONFIG.days` (0=lun).
+3. **Rendu UI** — `updateWeekDisplay`, `renderAllPanels`, `renderTabs`, `renderOverview`.
+4. **Bind admin events** — `bindAdminTreeEvents()`, `bindAdminEditorEvents()` (nécessaires même en mode utilisateur : les containers admin existent déjà dans le DOM).
+5. **Différé 800 ms : `tryRestoreToken()`** — laisse la lib `gsi/client` finir son chargement asynchrone. Si un token valide existe, `loadFromDrive()` écrase `LIVE_CONFIG` (config Drive prioritaire) puis fusionne la progression, puis re-rend l'UI.
+6. **Wake Lock** — première demande + écoute `visibilitychange` pour redemander au retour d'onglet (le lock est automatiquement relâché quand l'onglet n'est plus visible).
+
+> **Règle critique** : ne jamais déclencher un rendu avant l'étape 1. Sinon `LIVE_CONFIG` vaut son état post-module (un simple clone de `DEFAULT_CONFIG`) et une config utilisateur existante en localStorage est ignorée jusqu'au prochain boot.
 
 ---
 
