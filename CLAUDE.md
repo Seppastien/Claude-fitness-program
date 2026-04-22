@@ -6,8 +6,12 @@ Guide de développement pour Claude. Ce fichier décrit l'architecture, les conv
 
 ## Vue d'ensemble
 
-Fichier unique : `programme_semaine.html` (~1430 lignes)
+Fichier unique : `programme_semaine.html` (~2700 lignes).
 Aucune dépendance externe. Tout est en HTML/CSS/JS vanilla dans un seul fichier.
+
+Deux modes utilisateur cohabitent :
+- **Mode utilisateur** (par défaut) : programme + suivi + modale timer.
+- **Mode admin** : éditeur de configuration (⚙ dans la topbar). La classe `body.admin-mode` masque `overview-bar`, `day-tabs`, `day-panels` et la modale timer, et affiche `.admin-container`.
 
 ---
 
@@ -15,30 +19,47 @@ Aucune dépendance externe. Tout est en HTML/CSS/JS vanilla dans un seul fichier
 
 ```
 programme_semaine.html
-├── <style>          CSS complet (variables, composants, series tracker, repli)
-├── <body>           Topbar + sync bar + overview rings + day tabs + panels
+├── <style>          CSS complet (variables, composants, series tracker, repli,
+│                    admin mode, timer modal plein écran)
+├── <body>           Topbar (+ bouton ⚙ admin) + sync bar + overview rings +
+│                    day tabs + day panels + timer-modal + admin-container
 └── <script>
-    ├── DATA         Constantes DAYS, TYPE_LABELS, SESSIONS
-    ├── STATE        currentWeekOffset, activeDay, timers, serieTimers, driveState
-    ├── GOOGLE DRIVE OAuth2, load/save Drive, scheduleSave, fallback localStorage
+    ├── DATA         DEFAULT_CONFIG (days, typeLabels, typeColors, sessions),
+    │                LIVE_CONFIG, CONFIG_STORAGE_KEY
+    ├── CONFIG API   cloneDefaultConfig, isValidConfig, loadConfig, saveConfig,
+    │                scheduleSaveConfig, loadConfigFromDrive, saveConfigToDrive
+    ├── STATE        currentWeekOffset, activeDay, timers, serieTimers,
+    │                modalState, driveState
+    ├── GOOGLE DRIVE OAuth2, load/save Drive (progression + config séparés),
+    │                scheduleSave, fallback localStorage
     ├── RENDER       getSessionsForDay, countExercises, renderAllPanels,
     │                renderDayPanel, renderSeriesTracker, renderRepTracker,
     │                renderSubExoTracker, renderOverview, renderTabs
     ├── INTERACTIONS toggleEx, toggleVelo, setStar, setFeeling, saveJournalEntry,
     │                syncExValidation, toggleSerieCheck, repSerieCheck
-    ├── TIMERS       beep*, parseReps, parseRepSets, isDurationEx,
-    │                startSerieTimer, renderSeriesTracker, renderRepTracker
+    ├── TIMERS       beep*, parseReps, parseRepSets, isDurationEx, fmtTime,
+    │                startSerieTimer, tickSerieTimer, transitionToWork,
+    │                finishWorkPhase, finishRestPhase, resetSerieTimer
+    ├── TIMER MODAL  openTimerModal, closeTimerModal, updateTimerModal,
+    │                pauseModalTimer, skipModalTimer, resetModalTimer,
+    │                findExerciseInfo, modalState, PREP_SECS
     ├── REPLI        toggleSession, toggleExCollapse
     ├── WAKE LOCK    requestWakeLock() — empêche la mise en veille (Screen Wake Lock API)
-    └── WEEK NAV     changeWeek, updateWeekDisplay, init()
+    ├── WEEK NAV     changeWeek, updateWeekDisplay, init()
+    └── ADMIN MODE   toggleAdminMode, renderAdminTree, renderAdminEditor,
+                     adminAdd/Move/Duplicate/Delete (Session|Exercise),
+                     adminSubExo*, adminConvertToCombined/Simple,
+                     adminExportConfig, adminImportConfig, adminResetConfig
 ```
 
 ---
 
 ## Structure des données SESSIONS
 
+Les sessions vivent désormais dans `LIVE_CONFIG.sessions` (voir section *Système de configuration*). Toujours lire via `getSessionsForDay(dayId)` — **ne jamais** référencer une constante `SESSIONS` figée, elle n'existe plus en tant que globale mutable.
+
 ```javascript
-SESSIONS = {
+LIVE_CONFIG.sessions = {
   bureau: [ ...sessions ],   // Lun, Mer, Ven
   tele:   [ ...sessions ],   // Mar, Jeu
   weekend: {
@@ -200,9 +221,27 @@ Sens inverse (`toggleEx`) : cocher/décocher l'exercice directement (case princi
 
 ---
 
-## Auto-démarrage de la série suivante (timers durée)
+## Cycle d'une série en durée (3 phases)
 
-Dans `startSerieTimer`, à la fin de la phase de repos (reste ≤ 0), la série suivante démarre automatiquement via un `.click()` sur le bouton suivant dans le tracker :
+`startSerieTimer` est le point d'entrée ; il délègue chaque tick à `tickSerieTimer`, qui aiguille vers les transitions selon `st.phase`.
+
+| Phase | Durée | Son | Action en fin |
+|-------|-------|-----|---------------|
+| `prep` | `PREP_SECS` = 3 s | `beepStart()` à chaque seconde | `transitionToWork` → passe en `work` |
+| `work` | `secPerSet` | `beepHalf()` à mi-temps, `beepEnd()` en fin | `finishWorkPhase` → coche la série, puis `rest` (ou fin si dernière série) |
+| `rest` | `restSec` | `beepRestEnd()` en fin | `finishRestPhase` → auto-clic sur le bouton de la série suivante |
+
+Chaque série d'un exercice en durée suit donc **prep → work → rest → prep (série suivante)…** entièrement automatique une fois le premier démarrage lancé. À la dernière série, `finishWorkPhase` ferme la modale, replie l'exercice après 800 ms et ouvre le suivant :
+
+```javascript
+setTimeout(() => {
+  exItem.classList.add('collapsed');
+  const next = exItem.nextElementSibling;
+  if (next && next.classList.contains('ex-item')) next.classList.remove('collapsed');
+}, 800);
+```
+
+L'enchaînement série suivante se fait via `.click()` sur le bouton du tracker :
 
 ```javascript
 if (serieIdx + 1 < totalSets) {
@@ -211,7 +250,38 @@ if (serieIdx + 1 < totalSets) {
 }
 ```
 
-Cela crée une chaîne travail → repos → travail → repos … entièrement automatique une fois le premier démarrage lancé.
+---
+
+## Modale timer plein écran
+
+Pendant une série en durée, une modale `#timer-modal` s'affiche par-dessus l'app (masquée en `body.admin-mode`). Elle rappelle l'exercice en cours et expose trois actions utilisateur.
+
+### État
+
+```javascript
+const modalState = { sid: null, active: false };
+```
+
+Un seul timer peut être visible à la fois : la modale est liée au `sid` actif, et `updateTimerModal(sid, ...)` ignore tout appel concernant un autre `sid`.
+
+### API
+
+| Fonction | Rôle |
+|----------|------|
+| `openTimerModal(sid)` | Résout l'exercice via `findExerciseInfo(dayId, exId)`, remplit nom/desc/libellé série/reps, réinitialise le bouton pause, affiche la modale |
+| `closeTimerModal()` | Masque la modale, remet `modalState` à zéro |
+| `updateTimerModal(sid, phaseType, remaining)` | Met à jour le libellé de phase (`prep`/`work`/`rest`) et le compteur. En `prep`, le chiffre est agrandi (classe `.big`) |
+| `pauseModalTimer()` | Toggle `st.paused` — le tick ignore les secondes pendant la pause |
+| `skipModalTimer()` | Force la fin de la phase courante : `prep`→`transitionToWork`, `work`→`finishWorkPhase`, `rest`→`finishRestPhase` |
+| `resetModalTimer()` | Appelle `resetSerieTimer(sid)` puis `closeTimerModal()` |
+| `resetSerieTimer(sid)` | Nettoie l'interval, remet le bouton du tracker à son état initial |
+
+### Points d'attention
+
+- La résolution de l'exercice passe par `findExerciseInfo` qui lit `getSessionsForDay(dayId)` — donc **dépend de `LIVE_CONFIG`** et non de constantes figées.
+- Le libellé de série est **réutilisé** depuis le DOM (`.serie-label` de la ligne `#srow_{sid}`), pas recalculé — garantit l'alignement avec le tracker (ex : `Série 2/3`, `Gauche 1/3`, `Sphinx 2/3`).
+- Skip en `work` **valide la série** (coche auto + `syncExValidation`) comme si le timer était allé au bout.
+- Reset NE valide PAS la série et remet le bouton du tracker en état « prêt à démarrer ».
 
 ---
 
@@ -262,12 +332,88 @@ journal = { rating: 1-5, feeling: 'string', note: 'string' }
 
 ### Google Drive
 
-- Fichier unique : `fitness_programme_semaine.json`
-- Scope : `drive.file` (accès restreint au fichier créé par l'app)
-- Sync : debounce 2 s après chaque action (`scheduleSave`)
+- Deux fichiers distincts, tous deux avec scope `drive.file` (accès restreint aux fichiers créés par l'app) :
+  - `fitness_programme_semaine.json` — progression (checks + journal par semaine)
+  - `fitness_programme_config.json` — configuration du programme (`LIVE_CONFIG`)
+- Sync progression : debounce 2 s via `scheduleSave` / `saveToDrive`
+- Sync config : debounce 2 s via `scheduleSaveConfig` / `saveConfigToDrive`
 - Fallback : localStorage si non connecté
-- Au chargement : merge localStorage + Drive (`Object.assign({}, local, remote)` — Drive prioritaire)
+- Au chargement progression : merge localStorage + Drive (`Object.assign({}, local, remote)` — Drive prioritaire)
+- Au chargement config : `loadConfigFromDrive` écrase `LIVE_CONFIG` + miroir localStorage si le fichier Drive passe `isValidConfig`
 - Token restauré silencieusement via `tryRestoreToken()` (appelé 800 ms après init)
+
+---
+
+## Système de configuration (LIVE_CONFIG)
+
+Le programme (jours, sessions, exercices) n'est plus figé dans le source — il vit dans `LIVE_CONFIG` et est éditable via le mode admin.
+
+### Structure
+
+```javascript
+LIVE_CONFIG = {
+  version: 1,
+  meta: { createdAt, lastModified, source: 'default'|'user'|'import' },
+  days: [...],          // 7 jours
+  typeLabels: {...},    // mapping type → libellé FR
+  typeColors: {...},    // mapping type → couleur
+  sessions: {           // identique à l'ancienne constante SESSIONS
+    bureau: [...],
+    tele: [...],
+    weekend: { sam: [...], dim: [...] }
+  }
+}
+```
+
+### Priorité de chargement (au boot)
+
+1. `DEFAULT_CONFIG` cloné dans `LIVE_CONFIG` — programme livré par défaut
+2. `localStorage[CONFIG_STORAGE_KEY]` s'il existe et passe `isValidConfig`
+3. Drive (`fitness_programme_config.json`) s'il existe et passe `isValidConfig` — écrase les deux précédents
+
+### API
+
+| Fonction | Rôle |
+|----------|------|
+| `cloneDefaultConfig()` | Deep-clone de `DEFAULT_CONFIG` avec meta fraîche (`source: 'default'`) |
+| `isValidConfig(c)` | Vérifie version, days (len 7), typeLabels, typeColors, sessions.bureau/tele/weekend.sam/dim |
+| `loadConfig()` | Lit `localStorage`, fallback sur `cloneDefaultConfig()` si absent/invalide |
+| `saveConfig(newConfig, source)` | Valide, met à jour `meta.lastModified`, assigne `LIVE_CONFIG`, miroir localStorage, planifie sync Drive |
+| `scheduleSaveConfig()` | Debounce 2 s avant `saveConfigToDrive()` |
+| `loadConfigFromDrive()` / `saveConfigToDrive()` | I/O sur `fitness_programme_config.json` |
+
+### Règle critique
+
+Toute fonction de rendu doit lire via `getSessionsForDay(dayId)` **qui délègue à `LIVE_CONFIG.sessions`** — ne jamais référencer une constante `SESSIONS` figée. Idem pour `TYPE_LABELS` : passer par `LIVE_CONFIG.typeLabels`.
+
+---
+
+## Mode admin
+
+Activé par `toggleAdminMode()` (bouton ⚙ en topbar). Ajoute `body.admin-mode` qui masque la vue utilisateur et affiche `.admin-container` (éditeur en deux colonnes : arborescence + éditeur de champ).
+
+### Fonctions clés
+
+| Fonction | Rôle |
+|----------|------|
+| `renderAdminTree()` | Dessine l'arborescence jour → session → exercice, avec boutons d'ajout |
+| `renderAdminEditor()` | Formulaire contextuel (selon la sélection) avec tous les champs d'un exercice/session/vélo |
+| `adminAddSession/Exercise` | Création avec ID auto-généré unique (via `adminNewId`) |
+| `adminMoveSession/Exercise` | Déplacement haut/bas dans la liste parente |
+| `adminDuplicateSession/Exercise` | Clone avec nouvel ID |
+| `adminDeleteSession/Exercise` | Suppression (avec confirmation côté UI) |
+| `adminSubExoAdd/Delete/Move/Update` | Gestion des `subExos` d'un exercice combiné |
+| `adminConvertToCombined/Simple` | Bascule un exercice entre format simple et `subExos[]` |
+| `adminExportConfig()` | Télécharge `LIVE_CONFIG` en JSON |
+| `adminImportConfig(event)` | Lit un fichier JSON, valide via `isValidConfig`, appelle `saveConfig(..., 'import')` |
+| `adminResetConfig()` | `saveConfig(cloneDefaultConfig(), 'default')` après confirmation |
+
+### Règles éditeur
+
+- Toute édition appelle `saveConfig(...)` — pas de bouton « Sauvegarder ». Le debounce Drive se déclenche automatiquement.
+- Les IDs saisis sont vérifiés contre `adminCollectAllExerciseIds()` pour éviter les doublons.
+- La modale timer est forcée à `display:none` en `body.admin-mode` pour éviter toute interaction parasite (règle CSS explicite : `body.admin-mode .timer-modal{display:none !important}`).
+- `parseRepSets` / `parseReps` / `isDurationEx` restent les fonctions de référence : si on édite un champ `reps` côté admin, son interprétation côté rendu n'est pas recalculée — il faut que le format reste compatible avec ces parseurs.
 
 ---
 
@@ -308,3 +454,8 @@ Ces IDs sont utilisés comme clés dans l'objet `serieTimers` et comme suffixes 
 - **Après modification** : commit + push GitHub Desktop → attendre 1-2 min pour GitHub Pages
 - **parseRepSets** : ne jamais mettre un format `"N × texte"` où N > 1 si c'est une seule série — ça créerait N fausses séries
 - **Ajouter un subExo** : `sets` doit être défini sur l'exercice parent ; le repos entre cycles (fin de chaque cycle complet) est 15 s — entre les postures d'un même cycle : 0 s
+- **Modifier les données par défaut** : éditer `DEFAULT_CONFIG` — c'est la seule source figée dans le code. `LIVE_CONFIG` est mutable et reflète la config utilisateur
+- **Ajouter une phase au timer** : la transition doit être gérée dans `tickSerieTimer` + `transitionTo*`/`finish*Phase` ET dans `skipModalTimer` (sinon le bouton ⏭ devient incohérent)
+- **Nouveau libellé de phase** : ajouter la clé dans l'objet `labels` de `updateTimerModal` et la classe CSS correspondante (`.tm-phase.<nom>`)
+- **Champ éditable côté admin** : ajouter le contrôle dans `renderAdminEditor`, le handler dans `bindAdminEditorEvents`/`adminApplyFieldEdit`, et toujours appeler `saveConfig(...)` — ne jamais muter `LIVE_CONFIG` directement sans passer par `saveConfig`
+- **Import/export** : le JSON échangé doit passer `isValidConfig` — si on étend le schéma, bumper `version` et mettre à jour `isValidConfig` en conséquence

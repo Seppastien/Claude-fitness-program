@@ -44,7 +44,13 @@
       "WebFetch(domain:www.magicfit.fr)",
       "WebFetch(domain:conseilsport.decathlon.fr)",
       "WebFetch(domain:www.nutripure.fr)",
-      "Bash(git show *)"
+      "Bash(git show *)",
+      "Bash(git -C C:/GameDev/Claude-fitness-program log --oneline -10)",
+      "Bash(git -C C:/GameDev/Claude-fitness-program diff HEAD~1 HEAD --stat)",
+      "Bash(git -C C:/GameDev/Claude-fitness-program log --oneline -1 f8ecd9a)",
+      "Bash(git -C C:/GameDev/Claude-fitness-program show f8ecd9a --stat)",
+      "Bash(git -C C:/GameDev/Claude-fitness-program diff HEAD~1 HEAD -- programme_semaine.html)",
+      "Bash(git -C C:/GameDev/Claude-fitness-program log --oneline -20)"
     ]
   }
 }

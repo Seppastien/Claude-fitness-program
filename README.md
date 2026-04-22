@@ -19,13 +19,18 @@ L'interface adapte automatiquement ce qui est affiché selon l'avancement :
 
 ### Suivi des séries
 
-- **Exercices en durée** : timer automatique par série/côté avec 3 bips audio distincts
+- **Exercices en durée** : timer automatique par série/côté avec une modale plein écran et 3 bips audio distincts
+  - **Phase de préparation** : décompte 3 s avec bip à chaque seconde avant chaque série
   - Bip aigu court — début de série
   - Double bip médium — mi-temps
   - Triple bip grave — fin de série
   - Bip aigu montant — fin du temps de repos
-  - **Enchaînement automatique** : à la fin du repos, la série suivante démarre sans intervention
-  - À la fin de la dernière série : l'exercice se coche et l'exercice suivant s'ouvre
+  - **Enchaînement automatique** : à la fin du repos, la série suivante démarre sans intervention (prep → work → rest → prep…)
+  - À la fin de la dernière série : l'exercice se coche, la modale se ferme et l'exercice suivant s'ouvre
+  - **Modale timer** (plein écran) : rappelle le nom de l'exercice, sa description, le libellé de série et la consigne (reps/durée). Trois actions sont exposées :
+    - **⏸ Pause / ▶ Reprendre** — fige le décompte de la phase en cours
+    - **⏭ Sauter** — termine immédiatement la phase courante (prep→work, work→rest+valide la série, rest→série suivante)
+    - **⏹ Reset** — annule la série en cours et ferme la modale
 - **Exercices en répétitions** : case à cocher par série + timer de repos (60 s) déclenché automatiquement à la validation
   - Cliquer à nouveau pendant le repos annule le décompte
   - Cliquer sur une série déjà cochée (hors repos) la décoche (correction)
@@ -46,6 +51,18 @@ Les cases séries et la case principale de l'exercice restent toujours cohérent
 
 Chaque exercice peut afficher un lien `↗` vers une ressource externe (vidéo ou guide) pour contrôler la forme. Le lien s'ouvre dans un nouvel onglet sans interrompre le chronomètre en cours.
 
+### Mode administration
+
+Un bouton ⚙ dans la barre supérieure bascule vers un éditeur de configuration (jours, sessions, exercices, séries, vélo, subExos).
+
+- Arborescence jour → session → exercice avec ajout / duplication / déplacement / suppression
+- Éditeur de champ complet pour chaque exercice (id, nom, description, reps, durée, charge, type, fiche technique, subExos…)
+- **Export** de la configuration courante en fichier JSON
+- **Import** d'un fichier JSON (remplace la configuration active après validation de schéma)
+- **Reset** — restaure la configuration par défaut (programme livré avec le fichier)
+- La config utilisateur est stockée dans `localStorage` et dans un second fichier Drive `fitness_programme_config.json` (sync debounce 2 s). En ouverture, la config Drive prime sur la config locale.
+- La modale timer et la progression sont masquées en mode admin pour éviter toute interaction parasite pendant l'édition.
+
 ### Journal quotidien
 - Notation de la séance (1 à 5 étoiles)
 - Ressenti en un clic (Fatigué / En forme / Difficile / Parfait / Douleur)
@@ -54,7 +71,9 @@ Chaque exercice peut afficher un lien `↗` vers une ressource externe (vidéo o
 - Navigation par semaine avec historique complet
 
 ### Synchronisation Google Drive
-- Stockage dans un fichier `fitness_programme_semaine.json` sur Drive
+- Deux fichiers distincts sur Drive :
+  - `fitness_programme_semaine.json` — progression (checks + journal par semaine)
+  - `fitness_programme_config.json` — configuration du programme (éditée via le mode admin)
 - Sync automatique après chaque action (debounce 2 s — plusieurs actions rapides = 1 seul envoi)
 - Fallback localStorage si hors ligne
 - Restauration silencieuse de session au rechargement de page
