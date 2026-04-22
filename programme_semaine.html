@@ -1304,6 +1304,62 @@ function beepStart()  { beep(880, 0.15, 0.4); }             // aigu court — d�
 function beepHalf()   { beep(660, 0.2, 0.3); setTimeout(()=>beep(660,0.2,0.3),250); } // double médium — mi-temps
 function beepEnd()    { beep(440, 0.12, 0.4); setTimeout(()=>beep(440,0.12,0.4),180); setTimeout(()=>beep(440,0.25,0.5),360); } // triple grave — fin
 function beepRestEnd(){ beep(880, 0.12, 0.4); setTimeout(()=>beep(1100,0.3,0.5),200); } // aigu montant — fin repos
+// Petit arpège victorieux C-E-G-C — fin de la dernière série d'un exercice
+function beepExerciseDone() {
+  beep(523.25, 0.12, 0.35);
+  setTimeout(()=>beep(659.25, 0.12, 0.35), 110);
+  setTimeout(()=>beep(783.99, 0.12, 0.35), 220);
+  setTimeout(()=>beep(1046.50, 0.30, 0.45), 340);
+}
+// Victoire moyenne — dernière série du dernier exercice d'une séance (pas la journée)
+function beepSessionDone() {
+  beep(523.25, 0.12, 0.35);
+  setTimeout(()=>beep(659.25, 0.12, 0.35), 110);
+  setTimeout(()=>beep(783.99, 0.12, 0.35), 220);
+  setTimeout(()=>beep(1046.50, 0.16, 0.4), 340);
+  setTimeout(()=>beep(1318.51, 0.30, 0.5), 500);
+  setTimeout(()=>{
+    beep(659.25, 0.5, 0.26);
+    beep(1046.50, 0.5, 0.3);
+  }, 720);
+}
+// Grande fanfare — dernière série du dernier exercice de la journée
+function beepDayDone() {
+  beep(523.25, 0.14, 0.35);
+  setTimeout(()=>beep(659.25, 0.14, 0.35), 130);
+  setTimeout(()=>beep(783.99, 0.14, 0.35), 260);
+  setTimeout(()=>beep(1046.50, 0.18, 0.45), 390);
+  setTimeout(()=>beep(783.99, 0.14, 0.4), 600);
+  setTimeout(()=>beep(1046.50, 0.14, 0.45), 760);
+  setTimeout(()=>beep(1318.51, 0.20, 0.5), 900);
+  // accord final soutenu
+  setTimeout(()=>{
+    beep(523.25, 0.9, 0.28);
+    beep(659.25, 0.9, 0.28);
+    beep(783.99, 0.9, 0.28);
+    beep(1046.50, 0.9, 0.32);
+  }, 1100);
+}
+// Choisit le son selon l'état du jour/séance :
+//   journée complétée → fanfare ; séance complétée → victoire moyenne ; sinon → petit arpège.
+function playExerciseCompleteSound(chk) {
+  const tracker = chk ? chk.closest('.series-tracker') : null;
+  const dayId = tracker ? tracker.dataset.day : null;
+  const exId  = tracker ? tracker.dataset.ex  : null;
+  if (!dayId) { beepExerciseDone(); return; }
+  const { total, done } = countExercises(dayId);
+  if (total > 0 && done === total) { beepDayDone(); return; }
+  if (exId) {
+    const sessionId = getSessionIdForEx(dayId, exId);
+    const sessions = getSessionsForDay(dayId);
+    const s = sessions ? sessions.find(x => x.id === sessionId) : null;
+    if (s && s.exercises) {
+      const { checks } = loadData(dayId);
+      if (s.exercises.every(ex => checks[ex.id])) { beepSessionDone(); return; }
+    }
+  }
+  beepExerciseDone();
+}
 
 // ── Detect duration-based exercises ──
 function isDurationEx(ex) {
@@ -1446,13 +1502,12 @@ function repSerieCheck(sid, restSec, isLast) {
   // État 1 : coche la série
   chk.classList.add('done'); chk.textContent = '✓';
   syncExValidation(chk);
-  beepEnd();
-
-  // No rest after last set
   if (isLast) {
+    playExerciseCompleteSound(chk);
     if (phase) { phase.textContent = 'Exercice terminé !'; phase.className = 'serie-phase active-phase'; }
     return;
   }
+  beepEnd();
 
   // Start rest countdown
   if (phase) { phase.textContent = 'Repos…'; phase.className = 'serie-phase'; }
@@ -1695,19 +1750,21 @@ function transitionToWork(sid) {
 function finishWorkPhase(sid) {
   const st = serieTimers[sid];
   if (!st) return;
-  beepEnd();
+  const isLastSerie = (st.serieIdx === st.totalSets - 1);
+  if (!isLastSerie) beepEnd();
   const btn = document.getElementById('stbtn_'+sid);
   const phase = document.getElementById('sphase_'+sid);
   const chk = document.getElementById('schk_'+sid);
   if (chk && !chk.classList.contains('done')) {
     chk.classList.add('done'); chk.textContent = '✓';
   }
-  if (st.serieIdx === st.totalSets - 1) {
+  if (isLastSerie) {
     clearInterval(st.interval);
     serieTimers[sid] = null;
     if (btn) btn.classList.remove('running');
     if (phase) { phase.textContent = 'Terminé !'; phase.className = 'serie-phase active-phase'; }
     if (chk) syncExValidation(chk);
+    playExerciseCompleteSound(chk);
     closeTimerModal();
     if (btn) {
       const tracker = btn.closest('.series-tracker');
