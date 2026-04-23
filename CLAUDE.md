@@ -404,6 +404,47 @@ Toute fonction de rendu doit lire via `getSessionsForDay(dayId)` **qui délègue
 
 ---
 
+## Slider d'intensité par exercice
+
+Chaque exercice a un slider 50 %–150 % (pas 5 %, défaut 100 %) qui multiplie à la fois la **durée des séries** et le **nombre de reps** (pas le temps de repos). Visible sur la carte d'exercice (dans la zone dépliée, au-dessus du tracker) et via un badge `×NN%` affiché à côté de la note de reps ainsi que dans la modale timer plein écran.
+
+### Données
+
+- `SCALES_STORAGE_KEY = 'fitness_exercise_scales'` — clé localStorage + champ dans le fichier Drive progression.
+- `EXERCISE_SCALES` — objet `{ exId → percentage }`. **Global par exercice**, persiste d'une semaine à l'autre. N'est **pas** dans `LIVE_CONFIG` (donc l'export/import config reste portable).
+- Valeur à 100 → entrée supprimée de l'objet pour garder le store compact.
+
+### API
+
+| Fonction | Rôle |
+|----------|------|
+| `loadScales()` | Lit `localStorage[SCALES_STORAGE_KEY]`, fallback `{}` |
+| `getExerciseScale(exId)` | Retourne le % courant, 100 par défaut |
+| `saveScale(exId, pct)` | Clamp+arrondi à [50,150] pas 5, miroir localStorage, push Drive via `scheduleSave()` |
+
+### Helpers de scaling (point d'entrée unique)
+
+Tout affichage de reps/sec **doit** passer par :
+
+| Helper | Consommateur |
+|--------|--------------|
+| `scaledSec(ex)` | Timer d'exercice en durée (`parseReps` reçoit cette valeur) |
+| `scaledSubSec(ex, sub)` | Chaque posture d'un exercice combiné (`renderSubExoTracker`) |
+| `scaledRepsString(ex)` | Affichage de `ex.reps` sur la carte et dans la modale timer |
+
+Règle : **ne jamais référencer `ex.sec`, `ex.reps`, `sub.sec` directement pour l'affichage ou le timer** — toujours passer par les helpers. L'admin lit encore les valeurs brutes (mode admin non scalé, slider masqué via CSS).
+
+### Handlers
+
+- `onExerciseScaleInput(dayId, exId, value)` — appelé sur `oninput` pendant le drag, met à jour le label `%` en live (sans re-render).
+- `onExerciseScaleChange(dayId, exId, value)` — appelé sur `onchange` au relâchement : `saveScale`, puis rafraîchissement ciblé du reps label, du badge, et du `.series-tracker` (remplacement `innerHTML`). Si la modale timer est active pour un sid de cet exercice, ses `tm-reps` / `tm-scale` sont aussi rafraîchis.
+
+### Comportement pendant une série active
+
+Le scale est **capturé** dans `serieTimers[sid].secPerSet` au démarrage de la série. Modifier le slider en cours de série ne change **pas** le timer en cours — la nouvelle valeur s'applique à la série suivante. Volontaire.
+
+---
+
 ## Mode admin
 
 Activé par `toggleAdminMode()` (bouton ⚙ en topbar). Ajoute `body.admin-mode` qui masque la vue utilisateur et affiche `.admin-container` (éditeur en deux colonnes : arborescence + éditeur de champ).

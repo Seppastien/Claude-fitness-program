@@ -204,6 +204,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .badge-yoga{background:#FAEAF0;color:#A03060}
 .badge-muscu{background:#F0EAFA;color:#6A35A8}
 
+/* ── Slider d'intensité par exercice ── */
+.scale-badge{font-family:'DM Mono',monospace;font-size:10px;background:#EAF4F8;color:#2F6B85;border:1px solid rgba(47,107,133,.2);padding:2px 7px;border-radius:5px;white-space:nowrap}
+.ex-scale-row{display:flex;align-items:center;gap:10px;padding:.5rem 1.25rem;border-top:1px solid var(--border);background:var(--surface);font-size:11px;color:var(--muted)}
+.ex-item.collapsed .ex-scale-row{display:none}
+.ex-scale-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);flex-shrink:0}
+.ex-scale-slider{flex:1;accent-color:var(--bureau);cursor:pointer}
+.ex-scale-value{font-family:'DM Mono',monospace;min-width:42px;text-align:right;color:var(--text);font-size:11px}
+.tm-scale{font-family:'DM Mono',monospace;font-size:11px;color:#2F6B85;background:#EAF4F8;padding:4px 10px;border-radius:20px}
+body.admin-mode .ex-scale-row{display:none}
+
 /* ── REPLI SESSIONS & EXERCICES ── */
 .session-head{cursor:pointer;user-select:none}
 .session-toggle{background:none;border:none;cursor:pointer;padding:0 0 0 6px;color:var(--muted);font-size:16px;line-height:1;flex-shrink:0;transition:transform .2s;display:flex;align-items:center}
@@ -349,6 +359,7 @@ body.admin-mode .timer-modal{display:none !important}
     <div class="tm-meta">
       <span class="tm-serie" id="tm-serie"></span>
       <span class="tm-reps" id="tm-reps"></span>
+      <span class="tm-scale" id="tm-scale" style="display:none"></span>
     </div>
     <div class="tm-phase" id="tm-phase"></div>
     <div class="tm-time" id="tm-time">0</div>
@@ -630,6 +641,41 @@ function loadConfig() {
   LIVE_CONFIG = cloneDefaultConfig();
 }
 
+// ── Slider d'intensité par exercice (50–150 %) ──
+// Donnée utilisateur globale (pas dans LIVE_CONFIG). Clé unique partagée entre
+// toutes les semaines : un exercice gardé à 110 % l'est tant qu'on ne bouge pas
+// le slider. Pushé sur Drive via le fichier progression (scheduleSave).
+const SCALES_STORAGE_KEY = 'fitness_exercise_scales';
+let EXERCISE_SCALES = {};
+
+function loadScales() {
+  try {
+    const raw = localStorage.getItem(SCALES_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') return parsed;
+    }
+  } catch {}
+  return {};
+}
+
+function getExerciseScale(exId) {
+  const v = EXERCISE_SCALES[exId];
+  return (typeof v === 'number' && v >= 50 && v <= 150) ? v : 100;
+}
+
+function saveScale(exId, pct) {
+  const clamped = Math.max(50, Math.min(150, Math.round(pct / 5) * 5));
+  if (clamped === 100) delete EXERCISE_SCALES[exId];
+  else EXERCISE_SCALES[exId] = clamped;
+  try { localStorage.setItem(SCALES_STORAGE_KEY, JSON.stringify(EXERCISE_SCALES)); } catch {}
+  if (driveState.connected) {
+    driveState.data[SCALES_STORAGE_KEY] = EXERCISE_SCALES;
+    scheduleSave();
+  }
+  return clamped;
+}
+
 // ╔══════════════════════════════════════════════╗
 // ║  STATE — Variables globales & helpers date   ║
 // ╚══════════════════════════════════════════════╝
@@ -794,6 +840,11 @@ async function loadFromDrive() {
       if (!res) return;
       const remote = await res.json();
       driveState.data = Object.assign({}, getAllLocalData(), remote);
+      // Hydrate EXERCISE_SCALES depuis Drive si présent (source de vérité prioritaire).
+      if (driveState.data[SCALES_STORAGE_KEY] && typeof driveState.data[SCALES_STORAGE_KEY] === 'object') {
+        EXERCISE_SCALES = driveState.data[SCALES_STORAGE_KEY];
+        try { localStorage.setItem(SCALES_STORAGE_KEY, JSON.stringify(EXERCISE_SCALES)); } catch {}
+      }
       setSyncUI('connected', 'Drive connecté · ' + DRIVE_FILENAME);
     } else {
       driveState.data = getAllLocalData();
@@ -908,6 +959,11 @@ function getAllLocalData() {
     if (k && k.startsWith('fitness_w')) {
       try { all[k] = JSON.parse(localStorage.getItem(k)); } catch(e) {}
     }
+  }
+  // Inclure le mapping des scales par exercice (donnée utilisateur globale)
+  const rawScales = localStorage.getItem(SCALES_STORAGE_KEY);
+  if (rawScales) {
+    try { all[SCALES_STORAGE_KEY] = JSON.parse(rawScales); } catch(e) {}
   }
   return all;
 }
@@ -1133,6 +1189,8 @@ function renderDayPanel(day) {
           const checked = checks[ex.id] ? 'checked' : '';
           const exCollapsed = !!checked || firstOpenExFound;
           if (!checked && !firstOpenExFound) firstOpenExFound = true;
+          const exScale = getExerciseScale(ex.id);
+          const scaleBadge = exScale !== 100 ? `<span class="scale-badge" id="sbadge_${day.id}_${ex.id}">×${exScale}%</span>` : `<span class="scale-badge" id="sbadge_${day.id}_${ex.id}" style="display:none">×${exScale}%</span>`;
           return `<div class="ex-item${exCollapsed?' collapsed':''}" id="exitem_${day.id}_${ex.id}"><div class="ex-row ${checked}" id="exrow_${day.id}_${ex.id}" onclick="toggleExCollapse(event,'${day.id}','${ex.id}')">
                 <button type="button" class="ex-check" onclick="event.stopPropagation();toggleEx('${day.id}','${ex.id}','${s.id}')">${checked?'✓':''}</button>
                 <div class="ex-body">
@@ -1140,11 +1198,17 @@ function renderDayPanel(day) {
                   <div class="ex-desc">${ex.desc}</div>
                 </div>
                 <div class="ex-right">
-                  <span class="ex-reps">${ex.reps}</span>
+                  <span class="ex-reps" id="sreps_${day.id}_${ex.id}">${scaledRepsString(ex)}</span>
                   ${ex.charge ? `<span class="charge-tag">${ex.charge}</span>` : ''}
+                  ${scaleBadge}
                   <div class="type-dot dot-${ex.type}"></div>
                 </div>
                 <button class="ex-toggle">▾</button>
+              </div>
+              <div class="ex-scale-row" onclick="event.stopPropagation()">
+                <span class="ex-scale-label">Intensité</span>
+                <input type="range" class="ex-scale-slider" min="50" max="150" step="5" value="${exScale}" oninput="onExerciseScaleInput('${day.id}','${ex.id}',this.value)" onchange="onExerciseScaleChange('${day.id}','${ex.id}',this.value)">
+                <span class="ex-scale-value" id="sval_${day.id}_${ex.id}">${exScale}%</span>
               </div>
               ${ex.subExos ? renderSubExoTracker(day.id, ex) : isDurationEx(ex) ? renderSeriesTracker(day.id, ex) : renderRepTracker(day.id, ex)}</div>`;
         }).join('');
@@ -1212,6 +1276,70 @@ function bindDayEvents(dayId, panel) { /* events are inline for simplicity */ }
 // toggleEx : case principale de l'exercice (non via les séries).
 // Sens inverse de syncExValidation : force toutes les serie-check du tracker
 // à l'état coché/décoché pour rester cohérent avec l'exercice parent.
+// ── Handlers slider d'intensité ──
+// onExerciseScaleInput : appelé en continu pendant le drag — update léger du label %.
+// onExerciseScaleChange : appelé au relâchement — persiste + rafraîchit le tracker.
+function onExerciseScaleInput(dayId, exId, rawValue) {
+  const pct = Math.max(50, Math.min(150, Math.round(parseInt(rawValue, 10) / 5) * 5));
+  const valEl = document.getElementById(`sval_${dayId}_${exId}`);
+  if (valEl) valEl.textContent = pct + '%';
+}
+
+function onExerciseScaleChange(dayId, exId, rawValue) {
+  const pct = saveScale(exId, parseInt(rawValue, 10));
+  // Récupère l'exercice depuis LIVE_CONFIG pour recalculer l'affichage.
+  const sessions = getSessionsForDay(dayId);
+  if (!sessions) return;
+  let exObj = null;
+  for (const s of sessions) {
+    if (!s.exercises) continue;
+    const found = s.exercises.find(e => e.id === exId);
+    if (found) { exObj = found; break; }
+  }
+  if (!exObj) return;
+
+  // 1) Reps label sur la carte
+  const repsEl = document.getElementById(`sreps_${dayId}_${exId}`);
+  if (repsEl) repsEl.textContent = scaledRepsString(exObj);
+  // 2) Badge ×NN%
+  const badgeEl = document.getElementById(`sbadge_${dayId}_${exId}`);
+  if (badgeEl) {
+    badgeEl.textContent = `×${pct}%`;
+    badgeEl.style.display = pct !== 100 ? '' : 'none';
+  }
+  // 3) Value label sous le slider
+  const valEl = document.getElementById(`sval_${dayId}_${exId}`);
+  if (valEl) valEl.textContent = pct + '%';
+  // 4) Tracker de séries : remplace le markup (les onclick portent la nouvelle durée)
+  const tracker = document.getElementById(`st_${dayId}_${exId}`);
+  if (tracker && tracker.parentNode) {
+    const newHtml = exObj.subExos ? renderSubExoTracker(dayId, exObj)
+                   : isDurationEx(exObj) ? renderSeriesTracker(dayId, exObj)
+                   : renderRepTracker(dayId, exObj);
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = newHtml;
+    tracker.parentNode.replaceChild(wrapper.firstElementChild, tracker);
+    // Restaure l'état "done" des séries cochées côté checks
+    const { checks } = loadData(dayId);
+    if (checks[exId]) {
+      const newTracker = document.getElementById(`st_${dayId}_${exId}`);
+      if (newTracker) newTracker.querySelectorAll('.serie-check').forEach(c => {
+        c.classList.add('done'); c.textContent = '✓';
+      });
+    }
+  }
+  // 5) Modale timer active pour cet exercice : rafraîchir reps + badge échelle
+  if (modalState.active && modalState.sid && modalState.sid.startsWith(`${dayId}_${exId}_`)) {
+    const tmReps = document.getElementById('tm-reps');
+    if (tmReps) tmReps.textContent = scaledRepsString(exObj);
+    const tmScale = document.getElementById('tm-scale');
+    if (tmScale) {
+      if (pct !== 100) { tmScale.textContent = `×${pct}%`; tmScale.style.display = ''; }
+      else { tmScale.style.display = 'none'; }
+    }
+  }
+}
+
 function toggleEx(dayId, exId, sessionId) {
   const { checks } = loadData(dayId);
   checks[exId] = !checks[exId];
@@ -1424,7 +1552,7 @@ function parseReps(reps, totalSec) {
 
 // ── Render series tracker HTML ──
 function renderSeriesTracker(dayId, ex) {
-  const { sets, secPerSide, restSec, lateral } = parseReps(ex.reps, ex.sec);
+  const { sets, secPerSide, restSec, lateral } = parseReps(ex.reps, scaledSec(ex));
   let html = `<div class="series-tracker" id="st_${dayId}_${ex.id}" data-day="${dayId}" data-ex="${ex.id}">`;
 
   if (lateral) {
@@ -1470,6 +1598,30 @@ function renderSeriesTracker(dayId, ex) {
 function parseRepSets(reps) {
   const m = reps.match(/^(\d+)\s*[×x]\s*(\d)/);
   return m ? parseInt(m[1]) : 1;
+}
+
+// ── Helpers de scaling (slider 50–150 %) ──
+// Point d'entrée unique pour toute valeur affichée ou envoyée au timer :
+// si l'exercice a un scale != 100, ex.sec / ex.reps / sub.sec sont remappés ici.
+function scaledSec(ex) {
+  const s = getExerciseScale(ex.id);
+  return Math.max(1, Math.round((ex.sec || 0) * s / 100));
+}
+
+function scaledSubSec(ex, sub) {
+  const s = getExerciseScale(ex.id);
+  return Math.max(1, Math.round((sub.sec || 0) * s / 100));
+}
+
+// Remplace "N × M" (et "N × M s") par les valeurs scalées dans ex.reps. Conserve
+// tel quel les formats non reconnus ("10 souffles", "3 min", "10 × chaque sens").
+function scaledRepsString(ex) {
+  const s = getExerciseScale(ex.id);
+  if (s === 100 || !ex.reps) return ex.reps || '';
+  return ex.reps.replace(/^(\d+)\s*([×x])\s*(\d+)(\s*s)?/, (_, sets, sign, val, sSuffix) => {
+    const scaled = Math.max(1, Math.round(parseInt(val) * s / 100));
+    return `${sets} ${sign} ${scaled}${sSuffix || ''}`;
+  });
 }
 
 function renderRepTracker(dayId, ex) {
@@ -1621,7 +1773,13 @@ function openTimerModal(sid) {
   document.getElementById('tm-ex-name').textContent = ex.name;
   document.getElementById('tm-ex-desc').textContent = ex.desc || '';
   document.getElementById('tm-serie').textContent = serieLabel;
-  document.getElementById('tm-reps').textContent = ex.reps || '';
+  document.getElementById('tm-reps').textContent = scaledRepsString(ex);
+  const exScale = getExerciseScale(ex.id);
+  const tmScale = document.getElementById('tm-scale');
+  if (tmScale) {
+    if (exScale !== 100) { tmScale.textContent = `×${exScale}%`; tmScale.style.display = ''; }
+    else { tmScale.style.display = 'none'; }
+  }
   const pauseBtn = document.getElementById('tm-pause');
   if (pauseBtn) pauseBtn.textContent = '⏸ Pause';
   modalState.sid = sid;
@@ -1936,11 +2094,12 @@ function renderSubExoTracker(dayId, ex) {
       const sid = `${dayId}_${ex.id}_s${i}_sub${j}`;
       const isLast = (i === sets-1 && j === subs.length-1);
       const restSec = (j === subs.length-1) ? 15 : 0; // repos après fin de cycle uniquement
+      const subSec = scaledSubSec(ex, sub);
       html += `<div class="series-row" id="srow_${sid}">
         <div class="serie-check" id="schk_${sid}" onclick="toggleSerieCheck('${sid}')"></div>
         <span class="serie-label">${sub.name} ${i+1}/${sets}</span>
-        <button class="serie-timer-btn" id="stbtn_${sid}" onclick="startSerieTimer('${sid}',${sub.sec},${restSec},${i*subs.length+j},${sets*subs.length})">
-          ▶ <span id="stdisp_${sid}">${fmtTime(sub.sec)}</span>
+        <button class="serie-timer-btn" id="stbtn_${sid}" onclick="startSerieTimer('${sid}',${subSec},${restSec},${i*subs.length+j},${sets*subs.length})">
+          ▶ <span id="stdisp_${sid}">${fmtTime(subSec)}</span>
         </button>
         <span class="serie-phase" id="sphase_${sid}"></span>
       </div>`;
@@ -2768,6 +2927,7 @@ function adminResetConfig() {
 
 (function init() {
   loadConfig(); // Doit précéder tout rendu : LIVE_CONFIG est la source de vérité.
+  EXERCISE_SCALES = loadScales(); // Scales utilisateur — lus avant tout rendu (helpers scaled*).
   const jsDay = new Date().getDay(); // 0=dim, 1=lun...
   const dayMap = [6,0,1,2,3,4,5]; // JS Sunday=0 → LIVE_CONFIG.days index 6 (dim), Monday=1 → 0 (lun)...
   activeDay = LIVE_CONFIG.days[dayMap[jsDay] ?? 0].id;
