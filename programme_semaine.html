@@ -794,7 +794,10 @@ function tryRestoreToken() {
     google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CLIENT_ID, scope: DRIVE_SCOPE, prompt: 'none',
       callback: async (resp) => {
-        if (resp.error || !resp.access_token) return;
+        if (resp.error || !resp.access_token) {
+          setSyncUI('error', 'Session Drive expirée — reconnecte-toi');
+          return;
+        }
         driveState.accessToken = resp.access_token;
         driveState.connected = true;
         localStorage.setItem('fitness_drive_token', resp.access_token);
