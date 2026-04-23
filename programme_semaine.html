@@ -317,6 +317,12 @@ body:not(.admin-mode) .admin-container{display:none}
 .tm-btn.tm-skip:hover{background:var(--tele-bg)}
 .tm-btn.tm-reset{color:var(--red);border-color:rgba(184,64,64,.35)}
 .tm-btn.tm-reset:hover{background:#FBEDED}
+.tm-btn.tm-validate{background:var(--tele);color:#fff;border-color:var(--tele)}
+.tm-btn.tm-validate:hover{opacity:.9}
+.tm-btn.tm-close{color:var(--muted)}
+.tm-btn.tm-close:hover{background:var(--surface2)}
+.tm-next{font-size:12.5px;color:var(--muted);border-top:1px solid var(--border);padding-top:10px;margin-top:-8px;margin-bottom:14px;line-height:1.45;min-height:18px}
+.tm-next strong{color:var(--text);font-weight:600}
 body.admin-mode .timer-modal{display:none !important}
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -355,7 +361,7 @@ body.admin-mode .timer-modal{display:none !important}
 <!-- ── Panneaux jour (générés par renderAllPanels) ── -->
 <div class="day-panels" id="day-panels"></div>
 
-<!-- ── Modale timer plein écran (visible pendant chaque série en durée, masquée en mode admin) ── -->
+<!-- ── Modale timer plein écran (visible pendant chaque série durée + exécution/repos reps, masquée en mode admin) ── -->
 <div class="timer-modal hidden" id="timer-modal" aria-hidden="true" role="dialog">
   <div class="timer-modal-content">
     <div class="tm-ex-name" id="tm-ex-name"></div>
@@ -367,10 +373,13 @@ body.admin-mode .timer-modal{display:none !important}
     </div>
     <div class="tm-phase" id="tm-phase"></div>
     <div class="tm-time" id="tm-time">0</div>
+    <div class="tm-next" id="tm-next"></div>
     <div class="tm-actions">
       <button type="button" class="tm-btn tm-pause" id="tm-pause" onclick="pauseModalTimer()">⏸ Pause</button>
       <button type="button" class="tm-btn tm-skip" id="tm-skip" onclick="skipModalTimer()">⏭ Sauter</button>
       <button type="button" class="tm-btn tm-reset" id="tm-reset" onclick="resetModalTimer()">⏹ Reset</button>
+      <button type="button" class="tm-btn tm-validate" id="tm-validate" onclick="validateRepSerie()" style="display:none">✓ Valider</button>
+      <button type="button" class="tm-btn tm-close" id="tm-close" onclick="closeRepExecModal()" style="display:none">✕ Fermer</button>
     </div>
   </div>
 </div>
@@ -700,9 +709,9 @@ function saveScale(exId, pct) {
 //                     - Exercice en durée (startSerieTimer) :
 //                         { interval, remaining, phase:'prep'|'work'|'rest',
 //                           paused, secPerSet, restSec, serieIdx, totalSets }
-//                     - Repos d'une série en reps (repSerieCheck) :
+//                     - Repos d'une série en reps (startRepRest) :
 //                         { interval, remaining, paused, isRepRest:true,
-//                           isLast, chk }
+//                           isLast, chk, restSec }
 //                     Un sid absent ou à null = aucun timer actif.
 // adminState        : déclaré plus bas dans la section ADMIN MODE.
 // modalState        : déclaré plus bas dans la section TIMER MODAL.
@@ -1293,7 +1302,8 @@ function renderDayPanel(day) {
 // ╚══════════════════════════════════════════════╝
 // toggleEx       → case principale d'un exercice (sync vers toutes les séries).
 // toggleVelo     → case d'une direction vélo (aller / retour).
-// toggleSerieCheck / repSerieCheck / syncExValidation → cases série (durée/reps).
+// toggleSerieCheck / syncExValidation → cases série (durée & reps).
+// startRepSerie / validateRepSerie / closeRepExecModal / startRepRest → parcours reps via modale.
 // setStar / setFeeling / saveJournalEntry → journal quotidien (note, ressenti, texte).
 // updateSessionBadge / updateTabCount     → badges progression session/jour.
 // onExerciseScaleInput / onExerciseScaleChange → slider d'intensité 50–150 %.
@@ -1477,27 +1487,32 @@ function saveJournalEntry(dayId) {
 //   scaledSec/Sub/Reps      → helpers de scaling (slider 50–150 %).
 // Rendu des trackers
 //   renderSeriesTracker     → exercices en durée (simple ou /côté) — bouton "▶ Lancer toutes".
-//   renderRepTracker        → exercices en reps (simple ou /côté) — cases + repos.
+//   renderRepTracker        → exercices en reps (simple ou /côté) — bouton "▶ Lancer toutes".
 //   renderSubExoTracker     → exercices combinés (Sphinx→Enfant) — bouton "▶ Lancer toutes".
 // Interactions séries
-//   repSerieCheck           → case série reps, 3 états (cocher+repos, annuler repos, décocher).
-//   toggleSerieCheck        → case série durée, bascule cochée/décochée + sync exo.
-//   startAllSeries          → démarre la 1re série non terminée (durée + subExos uniquement).
+//   toggleSerieCheck        → case série (durée & reps), bascule cochée/décochée + sync exo.
+//   startAllSeries          → démarre la 1re série non terminée (durée, reps et subExos).
 // Cycle de vie d'un timer durée (3 phases, 100 % auto)
 //   startSerieTimer → tickSerieTimer → transitionToWork → finishWorkPhase
 //     → [rest] finishRestPhase → auto-click série suivante (ou fin).
 //   resetSerieTimer         → annule la série en cours sans la valider.
+// Cycle de vie d'une série reps (modale en deux temps)
+//   startRepSerie → ouvre la modale en 'rep-exec' (manuel, pas de timer)
+//     → validateRepSerie (coche) → startRepRest (repos décompté)
+//     → finishRepRest → auto-click série suivante (ou fin).
+//   closeRepExecModal       → ferme sans valider (bouton ✕ Fermer).
 //   finalizeExerciseCompletion → replie l'exo puis déplie le suivant (ou replie la séance).
 // Audio (Web Audio API)
 //   beepStart/Half/End/RestEnd        → bips de phase (exercices en durée).
 //   beepExerciseDone/SessionDone/DayDone → fanfares escaladées selon granularité.
 //   playExerciseCompleteSound         → point unique qui choisit la fanfare.
 // Modale timer plein écran (overlay, masquée en mode admin)
-//   openTimerModal          → série en durée (toutes phases).
-//   openRepRestModal        → repos d'une série en reps (phase rest uniquement).
+//   openTimerModal(sid, mode, opts) → point d'entrée unique, 3 modes :
+//     'duration' (prep/work/rest), 'rep-exec' (Valider/Fermer), 'rep-rest' (décompte).
+//   applyModalMode / updateNextLabel → bascule boutons et résumé "Suivant : …".
 //   updateTimerModal / closeTimerModal.
 //   pauseModalTimer / skipModalTimer / resetModalTimer — branchent différemment
-//     selon modalState.isRepRest.
+//     selon modalState.mode.
 
 function fmtTime(s) {
   return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
@@ -1686,7 +1701,9 @@ function renderRepTracker(dayId, ex) {
   const lateral = /\/côté/.test(ex.reps);
   const restSec = (typeof ex.restSec === 'number' && ex.restSec > 0) ? ex.restSec : 60;
   const info = ex.serieInfo || '';
+  const repsPerSet = getRepsPerSet(ex);
   let html = `<div class="series-tracker" id="st_${dayId}_${ex.id}" data-day="${dayId}" data-ex="${ex.id}">`;
+  html += `<button class="serie-start-all-btn" onclick="startAllSeries('${dayId}','${ex.id}')">▶ Lancer toutes les séries</button>`;
   if (info) html += `<span class="serie-info">${info}</span>`;
 
   if (lateral) {
@@ -1697,10 +1714,12 @@ function renderRepTracker(dayId, ex) {
         const sid = `${dayId}_${ex.id}_s${i}_${sides[s]}`;
         const isLast = (i === sets-1 && s === 1);
         html += `<div class="series-row" id="srow_${sid}">
-          <div class="serie-check" id="schk_${sid}" onclick="repSerieCheck('${sid}',${restSec},${isLast})"></div>
+          <div class="serie-check" id="schk_${sid}" onclick="toggleSerieCheck('${sid}')"></div>
           <span class="serie-label">${sideLabels[s]} ${i+1}/${sets}</span>
+          <button class="serie-timer-btn" id="stbtn_${sid}" onclick="startRepSerie('${sid}',${restSec},${isLast})">
+            ▶ <span id="stdisp_${sid}">${repsPerSet}</span>
+          </button>
           <span class="serie-phase" id="sphase_${sid}"></span>
-          <span id="stdisp_${sid}" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);flex-shrink:0;display:none"></span>
         </div>`;
       }
     }
@@ -1709,10 +1728,12 @@ function renderRepTracker(dayId, ex) {
       const sid = `${dayId}_${ex.id}_s${i}`;
       const isLast = i === sets - 1;
       html += `<div class="series-row" id="srow_${sid}">
-        <div class="serie-check" id="schk_${sid}" onclick="repSerieCheck('${sid}',${restSec},${isLast})"></div>
+        <div class="serie-check" id="schk_${sid}" onclick="toggleSerieCheck('${sid}')"></div>
         <span class="serie-label">Série ${i+1}/${sets}</span>
+        <button class="serie-timer-btn" id="stbtn_${sid}" onclick="startRepSerie('${sid}',${restSec},${isLast})">
+          ▶ <span id="stdisp_${sid}">${repsPerSet}</span>
+        </button>
         <span class="serie-phase" id="sphase_${sid}"></span>
-        <span id="stdisp_${sid}" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);flex-shrink:0;display:none"></span>
       </div>`;
     }
   }
@@ -1721,46 +1742,109 @@ function renderRepTracker(dayId, ex) {
   return html;
 }
 
-// repSerieCheck : gère 3 états pour une case série de type "reps".
-//   État 1 — non cochée, pas de timer → coche + lance décompte repos (sauf dernière série).
-//   État 2 — cochée + timer repos en cours → annule le timer (correction en cours de repos).
-//   État 3 — cochée, pas de timer → décoche (correction manuelle possible).
-function repSerieCheck(sid, restSec, isLast) {
-  const chk = document.getElementById('schk_'+sid);
-  const phase = document.getElementById('sphase_'+sid);
-  const disp = document.getElementById('stdisp_'+sid);
-  if (!chk) return;
+// getRepsPerSet : extrait le nombre de reps par série depuis ex.reps (format "N × M…").
+// Fallback : retourne la chaîne scaledRepsString telle quelle si le format n'est pas reconnu.
+function getRepsPerSet(ex) {
+  const reps = scaledRepsString(ex);
+  const m = reps.match(/^\d+\s*[×x]\s*(\d+)/);
+  return m ? m[1] : reps;
+}
 
-  // État 3 : déjà cochée, pas de timer → décoche (correction)
-  if (chk.classList.contains('done') && (!serieTimers[sid] || !serieTimers[sid].interval)) {
-    chk.classList.remove('done'); chk.textContent = '';
-    if (phase) { phase.textContent = ''; phase.className = 'serie-phase'; }
-    if (disp) disp.style.display = 'none';
-    syncExValidation(chk);
-    return;
-  }
+// startRepSerie : point d'entrée du bouton ▶ d'une série en reps.
+// Ouvre la modale en mode 'rep-exec' (pas de timer qui défile — action manuelle).
+// Si un timer de repos est en cours pour ce sid (cas d'un double-clic ou de
+// la touche "Lancer toutes" répétée), annule proprement puis retourne.
+function startRepSerie(sid, restSec, isLast) {
+  const btn = document.getElementById('stbtn_'+sid);
+  if (!btn) return;
 
-  // État 2 : timer repos en cours → annule
+  // Timer de repos actif pour cette série → annule et retourne (équivalent du
+  // "stop si déjà en cours" des durées).
   if (serieTimers[sid] && serieTimers[sid].interval) {
     clearInterval(serieTimers[sid].interval);
     serieTimers[sid] = null;
-    if (modalState.sid === sid) closeTimerModal();
-    if (disp) disp.style.display = 'none';
+    const disp = document.getElementById('stdisp_'+sid);
+    if (disp) disp.textContent = getRepsPerSetFromSid(sid);
+    const phase = document.getElementById('sphase_'+sid);
     if (phase) { phase.textContent = ''; phase.className = 'serie-phase'; }
+    btn.classList.remove('running', 'rest');
+    btn.innerHTML = `▶ <span id="stdisp_${sid}">${getRepsPerSetFromSid(sid)}</span>`;
+    if (modalState.sid === sid) closeTimerModal();
     return;
   }
 
-  // État 1 : coche la série
-  chk.classList.add('done'); chk.textContent = '✓';
-  if (!isLast) syncExValidation(chk);
+  openTimerModal(sid, 'rep-exec', { restSec, isLast });
+  btn.classList.add('running');
+}
+
+// Helper interne : reconstruit getRepsPerSet à partir d'un sid (via le DOM + LIVE_CONFIG).
+function getRepsPerSetFromSid(sid) {
+  const row = document.getElementById('srow_'+sid);
+  if (!row) return '';
+  const tracker = row.closest('.series-tracker');
+  if (!tracker) return '';
+  const ex = findExerciseInfo(tracker.dataset.day, tracker.dataset.ex);
+  return ex ? getRepsPerSet(ex) : '';
+}
+
+// validateRepSerie : handler du bouton "✓ Valider" dans la modale en mode rep-exec.
+// Coche la série, bipe, puis enchaîne sur la phase de repos (startRepRest).
+function validateRepSerie() {
+  const sid = modalState.sid;
+  if (!sid || modalState.mode !== 'rep-exec') return;
+  const meta = modalState.repMeta || {};
+  const restSec = (typeof meta.restSec === 'number' && meta.restSec > 0) ? meta.restSec : 60;
+  const isLast = !!meta.isLast;
+  const chk = document.getElementById('schk_'+sid);
+  if (chk && !chk.classList.contains('done')) {
+    chk.classList.add('done'); chk.textContent = '✓';
+  }
+  const btn = document.getElementById('stbtn_'+sid);
+  if (btn) btn.classList.remove('running');
+  if (!isLast && chk) syncExValidation(chk);
   beepEnd();
+  startRepRest(sid, restSec, isLast);
+}
 
-  // Décompte de repos — même sur la dernière série. Le son victorieux et la
-  // validation de l'exercice attendent la fin du repos.
+// closeRepExecModal : handler du bouton "✕ Fermer" dans la modale en mode rep-exec.
+// Ferme la modale sans rien cocher ; la série reste relançable via son ▶.
+function closeRepExecModal() {
+  const sid = modalState.sid;
+  if (sid) {
+    const btn = document.getElementById('stbtn_'+sid);
+    if (btn) btn.classList.remove('running');
+  }
+  closeTimerModal();
+}
+
+// startRepRest : lance le décompte de repos après validation d'une série en reps.
+// Transitionne la modale en mode 'rep-rest' (boutons ⏸ Pause / ⏭ Sauter / ⏹ Reset).
+// À la fin du repos : auto-clic sur le bouton ▶ suivant (comme les durées), ou
+// fin d'exercice si c'était la dernière série.
+function startRepRest(sid, restSec, isLast) {
+  const chk = document.getElementById('schk_'+sid);
+  if (!chk) { closeTimerModal(); return; }
+  const phase = document.getElementById('sphase_'+sid);
+  const btn = document.getElementById('stbtn_'+sid);
+
   if (phase) { phase.textContent = 'Repos…'; phase.className = 'serie-phase'; }
-  if (disp) { disp.style.display = 'inline'; disp.textContent = fmtTime(restSec); }
+  if (btn) {
+    btn.classList.remove('running');
+    btn.classList.add('rest');
+    btn.innerHTML = `⏸ <span id="stdisp_${sid}">${fmtTime(restSec)}</span>`;
+  }
 
-  serieTimers[sid] = { interval: null, remaining: restSec, paused: false, isRepRest: true, isLast, chk };
+  // Guard : si un timer traînait, on le nettoie avant de recréer.
+  if (serieTimers[sid] && serieTimers[sid].interval) clearInterval(serieTimers[sid].interval);
+  serieTimers[sid] = { interval: null, remaining: restSec, paused: false, isRepRest: true, isLast, chk, restSec };
+
+  modalState.mode = 'rep-rest';
+  modalState.isRepRest = true;
+  applyModalMode('rep-rest');
+  const pauseBtn = document.getElementById('tm-pause');
+  if (pauseBtn) pauseBtn.textContent = '⏸ Pause';
+  updateTimerModal(sid, 'rest', restSec);
+
   serieTimers[sid].interval = setInterval(() => {
     const st = serieTimers[sid];
     if (!st) return;
@@ -1773,24 +1857,105 @@ function repSerieCheck(sid, restSec, isLast) {
       clearInterval(st.interval);
       serieTimers[sid] = null;
       beepRestEnd();
-      closeTimerModal();
-      if (d) d.style.display = 'none';
-      const ph = document.getElementById('sphase_'+sid);
-      if (isLast) {
-        if (ph) { ph.textContent = 'Exercice terminé !'; ph.className = 'serie-phase active-phase'; }
-        syncExValidation(chk);
-        playExerciseCompleteSound(chk);
-        finalizeExerciseCompletion(chk);
-      } else {
-        if (ph) { ph.textContent = 'Série suivante !'; ph.className = 'serie-phase active-phase'; }
-        setTimeout(() => {
-          const ph2 = document.getElementById('sphase_'+sid);
-          if (ph2 && ph2.textContent === 'Série suivante !') { ph2.textContent = ''; ph2.className = 'serie-phase'; }
-        }, 3000);
-      }
+      finishRepRest(sid, isLast, chk);
     }
   }, 1000);
-  openRepRestModal(sid);
+}
+
+// finishRepRest : nettoyage post-repos reps. Si dernière série, ferme la modale
+// et déclenche finalizeExerciseCompletion + fanfare. Sinon auto-clic sur le ▶
+// suivant (même mécanisme que finishRestPhase pour les durées) — ce clic rouvre
+// la modale en mode rep-exec ou duration selon le type de l'exercice suivant.
+function finishRepRest(sid, isLast, chk) {
+  const bb = document.getElementById('stbtn_'+sid);
+  if (bb) {
+    bb.classList.remove('running', 'rest');
+    bb.innerHTML = `✓ <span id="stdisp_${sid}">0:00</span>`;
+  }
+  const ph = document.getElementById('sphase_'+sid);
+  closeTimerModal();
+
+  if (isLast) {
+    if (ph) { ph.textContent = 'Exercice terminé !'; ph.className = 'serie-phase active-phase'; }
+    if (chk) syncExValidation(chk);
+    playExerciseCompleteSound(chk);
+    finalizeExerciseCompletion(bb || chk);
+    return;
+  }
+
+  if (ph) { ph.textContent = 'Série suivante !'; ph.className = 'serie-phase active-phase'; }
+  if (bb) {
+    const tracker = bb.closest('.series-tracker');
+    if (tracker) {
+      const allBtns = tracker.querySelectorAll('.serie-timer-btn');
+      const idx = Array.from(allBtns).indexOf(bb);
+      if (idx >= 0 && allBtns[idx + 1]) allBtns[idx + 1].click();
+    }
+  }
+}
+
+// applyModalMode : affiche/masque les boutons de .tm-actions selon le contexte.
+//   'duration' / 'rep-rest' → Pause / Skip / Reset (les 3 actions d'un timer qui défile).
+//   'rep-exec'              → Valider / Fermer (action manuelle, pas de timer).
+function applyModalMode(mode) {
+  const show = (id, visible) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = visible ? '' : 'none';
+  };
+  const isRepExec = mode === 'rep-exec';
+  show('tm-pause', !isRepExec);
+  show('tm-skip', !isRepExec);
+  show('tm-reset', !isRepExec);
+  show('tm-validate', isRepExec);
+  show('tm-close', isRepExec);
+}
+
+// updateNextLabel : rafraîchit #tm-next avec le résumé de ce qui vient après.
+//   1) S'il reste des séries dans l'exo courant → "Suivant : {label série suivante}"
+//      (label copié depuis .serie-label du DOM pour rester cohérent avec le tracker).
+//   2) Sinon, exercice suivant dans la session → "Prochain exercice : {nom} — {reps}".
+//   3) Sinon → "🎉 Fin de séance".
+function updateNextLabel(sid) {
+  const el = document.getElementById('tm-next');
+  if (!el) return;
+  const row = document.getElementById('srow_'+sid);
+  if (!row) { el.textContent = ''; return; }
+  const tracker = row.closest('.series-tracker');
+  if (!tracker) { el.textContent = ''; return; }
+
+  const rows = Array.from(tracker.querySelectorAll('.series-row'));
+  const idx = rows.indexOf(row);
+  const nextRow = rows[idx + 1];
+  if (nextRow) {
+    const nextLabel = nextRow.querySelector('.serie-label');
+    el.textContent = `Suivant : ${nextLabel ? nextLabel.textContent : 'série suivante'}`;
+    return;
+  }
+
+  const dayId = tracker.dataset.day;
+  const exId = tracker.dataset.ex;
+  const sessions = getSessionsForDay(dayId);
+  if (sessions) {
+    for (const s of sessions) {
+      if (!s.exercises) continue;
+      const i = s.exercises.findIndex(e => e.id === exId);
+      if (i < 0) continue;
+      const nextEx = s.exercises[i + 1];
+      if (nextEx) {
+        el.innerHTML = '';
+        el.appendChild(document.createTextNode('Prochain exercice : '));
+        const strong = document.createElement('strong');
+        strong.textContent = nextEx.name;
+        el.appendChild(strong);
+        const reps = scaledRepsString(nextEx);
+        if (reps) el.appendChild(document.createTextNode(` — ${reps}`));
+        return;
+      }
+      el.textContent = '🎉 Fin de séance';
+      return;
+    }
+  }
+  el.textContent = '';
 }
 
 // ── Series timer state ──
@@ -1802,15 +1967,17 @@ function repSerieCheck(sid, restSec, isLast) {
 const serieTimers = {};
 
 // ── TIMER MODAL (overlay plein écran) ──
-// Deux contextes d'ouverture :
-//   openTimerModal   → série en durée (toutes les phases prep/work/rest).
-//   openRepRestModal → repos après une série en reps (phase rest uniquement).
-// Dans les deux cas : résumé exercice/série + 3 actions pause/skip/reset.
-// modalState.isRepRest : flag qui distingue les deux contextes. skipModalTimer
-// et resetModalTimer branchent différemment selon cette valeur.
+// Trois modes gérés par modalState.mode :
+//   'duration' → série en durée (phases prep / work / rest, boutons Pause/Skip/Reset).
+//   'rep-exec' → exécution d'une série reps (action manuelle, boutons Valider/Fermer).
+//   'rep-rest' → repos après une série reps (décompte, boutons Pause/Skip/Reset).
+// Point d'entrée unique : openTimerModal(sid, mode, opts). Pour 'rep-rest' on
+// transitionne depuis 'rep-exec' dans startRepRest (la modale reste ouverte).
+// modalState.isRepRest reste maintenu pour compat interne (= mode === 'rep-rest').
+// modalState.repMeta mémorise { restSec, isLast } pour valider/finir une série reps.
 // PREP_SECS : décompte de 3 s avant chaque série en durée (bip à chaque seconde).
 const PREP_SECS = 3;
-const modalState = { sid: null, active: false, isRepRest: false };
+const modalState = { sid: null, active: false, isRepRest: false, mode: null, repMeta: null };
 
 function findExerciseInfo(dayId, exId) {
   const sessions = getSessionsForDay(dayId);
@@ -1824,18 +1991,24 @@ function findExerciseInfo(dayId, exId) {
   return null;
 }
 
-function openTimerModal(sid) {
-  const btn = document.getElementById('stbtn_'+sid);
-  if (!btn) return;
-  const tracker = btn.closest('.series-tracker');
+// openTimerModal : point d'entrée unique pour ouvrir la modale plein écran.
+//   mode = 'duration' (défaut) → phases prep/work/rest avec Pause/Skip/Reset.
+//   mode = 'rep-exec'          → exécution reps manuelle avec Valider/Fermer.
+//   mode = 'rep-rest'          → repos reps avec Pause/Skip/Reset (on passe
+//                                 usuellement par startRepRest plutôt que par ici).
+// opts.restSec / opts.isLast sont conservés dans modalState.repMeta pour les
+// handlers Valider / Skip / Reset.
+function openTimerModal(sid, mode = 'duration', opts = {}) {
+  const row = document.getElementById('srow_'+sid);
+  if (!row) return;
+  const tracker = row.closest('.series-tracker');
   if (!tracker) return;
   const dayId = tracker.dataset.day;
   const exId = tracker.dataset.ex;
   const ex = findExerciseInfo(dayId, exId);
   if (!ex) return;
   // Étiquette série : réutilise le label déjà rendu ("Série 2/3", "Gauche 1/3", "Sphinx 2/3"…)
-  const row = document.getElementById('srow_'+sid);
-  const labelEl = row ? row.querySelector('.serie-label') : null;
+  const labelEl = row.querySelector('.serie-label');
   const serieLabel = labelEl ? labelEl.textContent : '';
   document.getElementById('tm-ex-name').textContent = ex.name;
   document.getElementById('tm-ex-desc').textContent = ex.desc || '';
@@ -1849,46 +2022,39 @@ function openTimerModal(sid) {
   }
   const pauseBtn = document.getElementById('tm-pause');
   if (pauseBtn) pauseBtn.textContent = '⏸ Pause';
-  modalState.sid = sid;
-  modalState.active = true;
-  const modal = document.getElementById('timer-modal');
-  modal.classList.remove('hidden');
-  modal.setAttribute('aria-hidden', 'false');
-}
 
-// openRepRestModal : variante de openTimerModal pour les exercices en reps.
-// Affiche la modale en phase 'rest' uniquement — pause/skip/reset gèrent
-// le timer de repos (serieTimers[sid].isRepRest = true). Appelé par repSerieCheck.
-function openRepRestModal(sid) {
-  const chk = document.getElementById('schk_'+sid);
-  if (!chk) return;
-  const tracker = chk.closest('.series-tracker');
-  if (!tracker) return;
-  const dayId = tracker.dataset.day;
-  const exId = tracker.dataset.ex;
-  const ex = findExerciseInfo(dayId, exId);
-  if (!ex) return;
-  const row = document.getElementById('srow_'+sid);
-  const labelEl = row ? row.querySelector('.serie-label') : null;
-  document.getElementById('tm-ex-name').textContent = ex.name;
-  document.getElementById('tm-ex-desc').textContent = ex.desc || '';
-  document.getElementById('tm-serie').textContent = labelEl ? labelEl.textContent : '';
-  document.getElementById('tm-reps').textContent = scaledRepsString(ex);
-  const exScale = getExerciseScale(ex.id);
-  const tmScale = document.getElementById('tm-scale');
-  if (tmScale) {
-    if (exScale !== 100) { tmScale.textContent = `×${exScale}%`; tmScale.style.display = ''; }
-    else { tmScale.style.display = 'none'; }
-  }
-  const pauseBtn = document.getElementById('tm-pause');
-  if (pauseBtn) pauseBtn.textContent = '⏸ Pause';
   modalState.sid = sid;
   modalState.active = true;
-  modalState.isRepRest = true;
+  modalState.mode = mode;
+  modalState.isRepRest = (mode === 'rep-rest');
+  modalState.repMeta = (mode === 'rep-exec' || mode === 'rep-rest')
+    ? { restSec: (typeof opts.restSec === 'number' ? opts.restSec : 60), isLast: !!opts.isLast }
+    : null;
+
+  applyModalMode(mode);
+  updateNextLabel(sid);
+
+  // En 'rep-exec' : pas de timer qui défile. On affiche le nombre de reps attendu
+  // dans #tm-time et un libellé de phase explicite.
+  if (mode === 'rep-exec') {
+    const phaseEl = document.getElementById('tm-phase');
+    if (phaseEl) { phaseEl.textContent = 'À toi de jouer'; phaseEl.className = 'tm-phase work'; }
+    const timeEl = document.getElementById('tm-time');
+    if (timeEl) {
+      timeEl.classList.remove('big', 'rest', 'paused');
+      timeEl.textContent = getRepsPerSet(ex);
+    }
+  }
+
   const modal = document.getElementById('timer-modal');
   modal.classList.remove('hidden');
   modal.setAttribute('aria-hidden', 'false');
-  updateTimerModal(sid, 'rest', serieTimers[sid] ? serieTimers[sid].remaining : 0);
+
+  // En 'rep-rest' (appel direct rare — normalement on passe par startRepRest),
+  // on synchronise l'affichage du compteur avec le timer en cours.
+  if (mode === 'rep-rest' && serieTimers[sid]) {
+    updateTimerModal(sid, 'rest', serieTimers[sid].remaining);
+  }
 }
 
 function closeTimerModal() {
@@ -1899,8 +2065,12 @@ function closeTimerModal() {
   modalState.sid = null;
   modalState.active = false;
   modalState.isRepRest = false;
+  modalState.mode = null;
+  modalState.repMeta = null;
   const timeEl = document.getElementById('tm-time');
   if (timeEl) timeEl.classList.remove('paused');
+  const nextEl = document.getElementById('tm-next');
+  if (nextEl) nextEl.textContent = '';
 }
 
 function updateTimerModal(sid, phaseType, remaining) {
@@ -1939,27 +2109,12 @@ function skipModalTimer() {
   const st = serieTimers[sid];
   if (!st) return;
   st.paused = false;
-  if (modalState.isRepRest) {
+  if (modalState.mode === 'rep-rest') {
     const { isLast, chk } = st;
     clearInterval(st.interval);
     serieTimers[sid] = null;
     beepRestEnd();
-    closeTimerModal();
-    const d = document.getElementById('stdisp_'+sid);
-    if (d) d.style.display = 'none';
-    const ph = document.getElementById('sphase_'+sid);
-    if (isLast) {
-      if (ph) { ph.textContent = 'Exercice terminé !'; ph.className = 'serie-phase active-phase'; }
-      syncExValidation(chk);
-      playExerciseCompleteSound(chk);
-      finalizeExerciseCompletion(chk);
-    } else {
-      if (ph) { ph.textContent = 'Série suivante !'; ph.className = 'serie-phase active-phase'; }
-      setTimeout(() => {
-        const ph2 = document.getElementById('sphase_'+sid);
-        if (ph2 && ph2.textContent === 'Série suivante !') { ph2.textContent = ''; ph2.className = 'serie-phase'; }
-      }, 3000);
-    }
+    finishRepRest(sid, isLast, chk);
     return;
   }
   if (st.phase === 'prep') {
@@ -1979,11 +2134,14 @@ function skipModalTimer() {
 function resetModalTimer() {
   const sid = modalState.sid;
   if (!sid) { closeTimerModal(); return; }
-  if (modalState.isRepRest) {
+  if (modalState.mode === 'rep-rest') {
     const st = serieTimers[sid];
     if (st) { clearInterval(st.interval); serieTimers[sid] = null; }
-    const d = document.getElementById('stdisp_'+sid);
-    if (d) d.style.display = 'none';
+    const bb = document.getElementById('stbtn_'+sid);
+    if (bb) {
+      bb.classList.remove('running', 'rest');
+      bb.innerHTML = `▶ <span id="stdisp_${sid}">${getRepsPerSetFromSid(sid)}</span>`;
+    }
     const ph = document.getElementById('sphase_'+sid);
     if (ph) { ph.textContent = ''; ph.className = 'serie-phase'; }
     closeTimerModal();
@@ -2193,7 +2351,7 @@ function getSessionIdForEx(dayId, exId) {
 }
 
 // syncExValidation : maintient la cohérence séries ↔ exercice dans les deux sens.
-// Appelée après chaque changement d'une case série (repSerieCheck, toggleSerieCheck, startSerieTimer).
+// Appelée après chaque changement d'une case série (toggleSerieCheck, validateRepSerie, finishWorkPhase, finishRepRest).
 // - Toutes les série-check "done" → marque l'exercice checked, sauvegarde, rafraîchit badge/onglet/overview.
 // - Au moins une série décochée → démarque l'exercice si il était checked.
 function syncExValidation(chk) {
