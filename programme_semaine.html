@@ -1694,15 +1694,11 @@ function repSerieCheck(sid, restSec, isLast) {
 
   // État 1 : coche la série
   chk.classList.add('done'); chk.textContent = '✓';
-  syncExValidation(chk);
-  if (isLast) {
-    playExerciseCompleteSound(chk);
-    if (phase) { phase.textContent = 'Exercice terminé !'; phase.className = 'serie-phase active-phase'; }
-    return;
-  }
+  if (!isLast) syncExValidation(chk);
   beepEnd();
 
-  // Start rest countdown
+  // Décompte de repos — même sur la dernière série. Le son victorieux et la
+  // validation de l'exercice attendent la fin du repos.
   if (phase) { phase.textContent = 'Repos…'; phase.className = 'serie-phase'; }
   if (disp) { disp.style.display = 'inline'; disp.textContent = fmtTime(restSec); }
 
@@ -1719,11 +1715,18 @@ function repSerieCheck(sid, restSec, isLast) {
       beepRestEnd();
       if (d) d.style.display = 'none';
       const ph = document.getElementById('sphase_'+sid);
-      if (ph) { ph.textContent = 'Série suivante !'; ph.className = 'serie-phase active-phase'; }
-      setTimeout(() => {
-        const ph2 = document.getElementById('sphase_'+sid);
-        if (ph2 && ph2.textContent === 'Série suivante !') { ph2.textContent = ''; ph2.className = 'serie-phase'; }
-      }, 3000);
+      if (isLast) {
+        if (ph) { ph.textContent = 'Exercice terminé !'; ph.className = 'serie-phase active-phase'; }
+        syncExValidation(chk);
+        playExerciseCompleteSound(chk);
+        finalizeExerciseCompletion(chk);
+      } else {
+        if (ph) { ph.textContent = 'Série suivante !'; ph.className = 'serie-phase active-phase'; }
+        setTimeout(() => {
+          const ph2 = document.getElementById('sphase_'+sid);
+          if (ph2 && ph2.textContent === 'Série suivante !') { ph2.textContent = ''; ph2.className = 'serie-phase'; }
+        }, 3000);
+      }
     }
   }, 1000);
 }
@@ -1957,37 +1960,14 @@ function transitionToWork(sid) {
 function finishWorkPhase(sid) {
   const st = serieTimers[sid];
   if (!st) return;
-  const isLastSerie = (st.serieIdx === st.totalSets - 1);
-  if (!isLastSerie) beepEnd();
+  beepEnd();
   const btn = document.getElementById('stbtn_'+sid);
   const phase = document.getElementById('sphase_'+sid);
   const chk = document.getElementById('schk_'+sid);
   if (chk && !chk.classList.contains('done')) {
     chk.classList.add('done'); chk.textContent = '✓';
   }
-  if (isLastSerie) {
-    clearInterval(st.interval);
-    serieTimers[sid] = null;
-    if (btn) btn.classList.remove('running');
-    if (phase) { phase.textContent = 'Terminé !'; phase.className = 'serie-phase active-phase'; }
-    if (chk) syncExValidation(chk);
-    playExerciseCompleteSound(chk);
-    closeTimerModal();
-    if (btn) {
-      const tracker = btn.closest('.series-tracker');
-      if (tracker) {
-        const exItem = tracker.closest('.ex-item');
-        if (exItem) {
-          setTimeout(() => {
-            exItem.classList.add('collapsed');
-            const next = exItem.nextElementSibling;
-            if (next && next.classList.contains('ex-item')) next.classList.remove('collapsed');
-          }, 800);
-        }
-      }
-    }
-    return;
-  }
+  // Toujours passer en repos, même sur la dernière série — finishRestPhase branche la suite.
   st.phase = 'rest';
   st.remaining = st.restSec;
   if (btn) {
@@ -1999,11 +1979,30 @@ function finishWorkPhase(sid) {
   updateTimerModal(sid, 'rest', st.restSec);
 }
 
+// Replie l'exercice courant après 800 ms puis déplie le suivant. Si c'est le
+// dernier exercice de la séance, replie également la carte de séance.
+function finalizeExerciseCompletion(anchor) {
+  if (!anchor) return;
+  const exItem = anchor.closest ? anchor.closest('.ex-item') : null;
+  if (!exItem) return;
+  setTimeout(() => {
+    exItem.classList.add('collapsed');
+    const next = exItem.nextElementSibling;
+    if (next && next.classList.contains('ex-item')) {
+      next.classList.remove('collapsed');
+    } else {
+      const sessionCard = exItem.closest('.session-card');
+      if (sessionCard) sessionCard.classList.add('collapsed');
+    }
+  }, 800);
+}
+
 function finishRestPhase(sid) {
   const st = serieTimers[sid];
   if (!st) return;
   beepRestEnd();
   const serieIdx = st.serieIdx, totalSets = st.totalSets;
+  const isLastSerie = (serieIdx === totalSets - 1);
   clearInterval(st.interval);
   serieTimers[sid] = null;
   const pb = document.getElementById('stbtn_'+sid);
@@ -2012,16 +2011,23 @@ function finishRestPhase(sid) {
     pb.innerHTML = `✓ <span id="stdisp_${sid}">0:00</span>`;
   }
   const phase = document.getElementById('sphase_'+sid);
-  if (phase) { phase.textContent = 'Série suivante !'; phase.className = 'serie-phase active-phase'; }
   closeTimerModal();
-  if (serieIdx + 1 < totalSets) {
-    const currentBtn = document.getElementById('stbtn_'+sid);
-    if (currentBtn) {
-      const tracker = currentBtn.closest('.series-tracker');
-      if (tracker) {
-        const allBtns = tracker.querySelectorAll('.serie-timer-btn');
-        if (allBtns[serieIdx + 1]) allBtns[serieIdx + 1].click();
-      }
+
+  if (isLastSerie) {
+    if (phase) { phase.textContent = 'Terminé !'; phase.className = 'serie-phase active-phase'; }
+    const chk = document.getElementById('schk_'+sid);
+    if (chk) syncExValidation(chk);
+    playExerciseCompleteSound(chk);
+    finalizeExerciseCompletion(pb || chk);
+    return;
+  }
+
+  if (phase) { phase.textContent = 'Série suivante !'; phase.className = 'serie-phase active-phase'; }
+  if (pb) {
+    const tracker = pb.closest('.series-tracker');
+    if (tracker) {
+      const allBtns = tracker.querySelectorAll('.serie-timer-btn');
+      if (allBtns[serieIdx + 1]) allBtns[serieIdx + 1].click();
     }
   }
 }
