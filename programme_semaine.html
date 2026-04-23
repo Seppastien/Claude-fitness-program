@@ -1692,6 +1692,7 @@ function repSerieCheck(sid, restSec, isLast) {
   if (serieTimers[sid] && serieTimers[sid].interval) {
     clearInterval(serieTimers[sid].interval);
     serieTimers[sid] = null;
+    if (modalState.sid === sid) closeTimerModal();
     if (disp) disp.style.display = 'none';
     if (phase) { phase.textContent = ''; phase.className = 'serie-phase'; }
     return;
@@ -1707,17 +1708,20 @@ function repSerieCheck(sid, restSec, isLast) {
   if (phase) { phase.textContent = 'Repos…'; phase.className = 'serie-phase'; }
   if (disp) { disp.style.display = 'inline'; disp.textContent = fmtTime(restSec); }
 
-  serieTimers[sid] = { interval: null, remaining: restSec };
+  serieTimers[sid] = { interval: null, remaining: restSec, paused: false, isRepRest: true, isLast, chk };
   serieTimers[sid].interval = setInterval(() => {
     const st = serieTimers[sid];
     if (!st) return;
+    if (st.paused) return;
     st.remaining--;
     const d = document.getElementById('stdisp_'+sid);
     if (d) d.textContent = fmtTime(Math.max(0, st.remaining));
+    updateTimerModal(sid, 'rest', st.remaining);
     if (st.remaining <= 0) {
       clearInterval(st.interval);
       serieTimers[sid] = null;
       beepRestEnd();
+      closeTimerModal();
       if (d) d.style.display = 'none';
       const ph = document.getElementById('sphase_'+sid);
       if (isLast) {
@@ -1734,6 +1738,7 @@ function repSerieCheck(sid, restSec, isLast) {
       }
     }
   }, 1000);
+  openRepRestModal(sid);
 }
 
 // ── Series timer state ──
@@ -1751,7 +1756,7 @@ const serieTimers = {};
 // d'un autre tracker encore en vie.
 // PREP_SECS : phase de préparation avant chaque série (bip à chaque seconde).
 const PREP_SECS = 3;
-const modalState = { sid: null, active: false };
+const modalState = { sid: null, active: false, isRepRest: false };
 
 function findExerciseInfo(dayId, exId) {
   const sessions = getSessionsForDay(dayId);
@@ -1797,6 +1802,38 @@ function openTimerModal(sid) {
   modal.setAttribute('aria-hidden', 'false');
 }
 
+function openRepRestModal(sid) {
+  const chk = document.getElementById('schk_'+sid);
+  if (!chk) return;
+  const tracker = chk.closest('.series-tracker');
+  if (!tracker) return;
+  const dayId = tracker.dataset.day;
+  const exId = tracker.dataset.ex;
+  const ex = findExerciseInfo(dayId, exId);
+  if (!ex) return;
+  const row = document.getElementById('srow_'+sid);
+  const labelEl = row ? row.querySelector('.serie-label') : null;
+  document.getElementById('tm-ex-name').textContent = ex.name;
+  document.getElementById('tm-ex-desc').textContent = ex.desc || '';
+  document.getElementById('tm-serie').textContent = labelEl ? labelEl.textContent : '';
+  document.getElementById('tm-reps').textContent = scaledRepsString(ex);
+  const exScale = getExerciseScale(ex.id);
+  const tmScale = document.getElementById('tm-scale');
+  if (tmScale) {
+    if (exScale !== 100) { tmScale.textContent = `×${exScale}%`; tmScale.style.display = ''; }
+    else { tmScale.style.display = 'none'; }
+  }
+  const pauseBtn = document.getElementById('tm-pause');
+  if (pauseBtn) pauseBtn.textContent = '⏸ Pause';
+  modalState.sid = sid;
+  modalState.active = true;
+  modalState.isRepRest = true;
+  const modal = document.getElementById('timer-modal');
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+  updateTimerModal(sid, 'rest', serieTimers[sid] ? serieTimers[sid].remaining : 0);
+}
+
 function closeTimerModal() {
   const modal = document.getElementById('timer-modal');
   if (!modal) return;
@@ -1804,6 +1841,7 @@ function closeTimerModal() {
   modal.setAttribute('aria-hidden', 'true');
   modalState.sid = null;
   modalState.active = false;
+  modalState.isRepRest = false;
   const timeEl = document.getElementById('tm-time');
   if (timeEl) timeEl.classList.remove('paused');
 }
@@ -1844,6 +1882,29 @@ function skipModalTimer() {
   const st = serieTimers[sid];
   if (!st) return;
   st.paused = false;
+  if (modalState.isRepRest) {
+    const { isLast, chk } = st;
+    clearInterval(st.interval);
+    serieTimers[sid] = null;
+    beepRestEnd();
+    closeTimerModal();
+    const d = document.getElementById('stdisp_'+sid);
+    if (d) d.style.display = 'none';
+    const ph = document.getElementById('sphase_'+sid);
+    if (isLast) {
+      if (ph) { ph.textContent = 'Exercice terminé !'; ph.className = 'serie-phase active-phase'; }
+      syncExValidation(chk);
+      playExerciseCompleteSound(chk);
+      finalizeExerciseCompletion(chk);
+    } else {
+      if (ph) { ph.textContent = 'Série suivante !'; ph.className = 'serie-phase active-phase'; }
+      setTimeout(() => {
+        const ph2 = document.getElementById('sphase_'+sid);
+        if (ph2 && ph2.textContent === 'Série suivante !') { ph2.textContent = ''; ph2.className = 'serie-phase'; }
+      }, 3000);
+    }
+    return;
+  }
   if (st.phase === 'prep') {
     transitionToWork(sid);
     return;
@@ -1861,6 +1922,16 @@ function skipModalTimer() {
 function resetModalTimer() {
   const sid = modalState.sid;
   if (!sid) { closeTimerModal(); return; }
+  if (modalState.isRepRest) {
+    const st = serieTimers[sid];
+    if (st) { clearInterval(st.interval); serieTimers[sid] = null; }
+    const d = document.getElementById('stdisp_'+sid);
+    if (d) d.style.display = 'none';
+    const ph = document.getElementById('sphase_'+sid);
+    if (ph) { ph.textContent = ''; ph.className = 'serie-phase'; }
+    closeTimerModal();
+    return;
+  }
   resetSerieTimer(sid);
   closeTimerModal();
 }
