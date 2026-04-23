@@ -196,6 +196,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .serie-phase.active-phase{color:var(--tele)}
 
 .serie-info{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);background:var(--surface2);border-radius:6px;padding:5px 10px;white-space:normal;line-height:1.5;display:block;margin-bottom:.4rem}
+.serie-start-all-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;border:1px solid var(--tele);background:var(--tele-bg);color:var(--tele);border-radius:8px;padding:8px 12px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;cursor:pointer;margin-bottom:.5rem;transition:all .15s}
+.serie-start-all-btn:hover{background:var(--tele);color:white}
+.serie-start-all-btn:disabled{opacity:.5;cursor:not-allowed}
+.serie-start-all-btn:disabled:hover{background:var(--tele-bg);color:var(--tele)}
 /* Scrollbar */
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
@@ -1554,6 +1558,7 @@ function parseReps(reps, totalSec) {
 function renderSeriesTracker(dayId, ex) {
   const { sets, secPerSide, restSec, lateral } = parseReps(ex.reps, scaledSec(ex));
   let html = `<div class="series-tracker" id="st_${dayId}_${ex.id}" data-day="${dayId}" data-ex="${ex.id}">`;
+  html += `<button class="serie-start-all-btn" onclick="startAllSeries('${dayId}','${ex.id}')">▶ Lancer toutes les séries</button>`;
 
   if (lateral) {
     // 6 rows (for 3 sets): Gauche 1/3, Droite 1/3, Gauche 2/3 ...
@@ -1876,6 +1881,23 @@ function resetSerieTimer(sid) {
   if (phase) { phase.textContent = ''; phase.className = 'serie-phase'; }
 }
 
+// startAllSeries : lance la première série non terminée d'un exercice en durée.
+// Les suivantes s'enchaînent automatiquement via finishRestPhase (.click sur le bouton suivant).
+function startAllSeries(dayId, exId) {
+  const tracker = document.getElementById('st_' + dayId + '_' + exId);
+  if (!tracker) return;
+  const rows = tracker.querySelectorAll('.series-row');
+  for (const row of rows) {
+    const chk = row.querySelector('.serie-check');
+    const btn = row.querySelector('.serie-timer-btn');
+    if (!chk || !btn) continue;
+    if (chk.classList.contains('done')) continue;
+    if (btn.classList.contains('running')) return;
+    btn.click();
+    return;
+  }
+}
+
 // startSerieTimer : timer pour les exercices en durée (isDurationEx).
 // Phases : 'prep' (décompte 3 s avec bip à chaque seconde) → 'work' (décompte
 // avec bips mi-temps/fin) → 'rest' (décompte repos en or) → auto-clic série suivante.
@@ -2095,6 +2117,7 @@ function renderSubExoTracker(dayId, ex) {
   const sets = ex.sets || 1;
   const subs = ex.subExos || [];
   let html = `<div class="series-tracker" id="st_${dayId}_${ex.id}" data-day="${dayId}" data-ex="${ex.id}">`;
+  html += `<button class="serie-start-all-btn" onclick="startAllSeries('${dayId}','${ex.id}')">▶ Lancer toutes les séries</button>`;
   for (let i = 0; i < sets; i++) {
     subs.forEach((sub, j) => {
       const sid = `${dayId}_${ex.id}_s${i}_sub${j}`;
