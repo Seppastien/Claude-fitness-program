@@ -51,6 +51,15 @@ Les cases séries et la case principale de l'exercice restent toujours cohérent
 
 Chaque exercice peut afficher un lien `↗` vers une ressource externe (vidéo ou guide) pour contrôler la forme. Le lien s'ouvre dans un nouvel onglet sans interrompre le chronomètre en cours.
 
+### Slider d'intensité par exercice
+
+Chaque exercice expose un slider 50 %–150 % (pas 5 %, défaut 100 %) qui multiplie à la fois la **durée des séries** et le **nombre de répétitions** (pas le temps de repos).
+
+- Le badge `×NN%` apparaît à côté de la note de reps quand le slider est ≠ 100 %, et est repris dans la modale timer plein écran.
+- Valeur **globale par exercice** : un exercice réglé à 110 % le reste d'une semaine à l'autre tant qu'on ne touche pas au slider.
+- La configuration du programme (mode admin, import/export) reste indépendante du scaling : un fichier de config échangé entre utilisateurs ne transporte pas les scales personnels.
+- Modifier le slider **pendant** une série active n'affecte pas la série en cours (la valeur est figée au démarrage) — la nouvelle intensité s'applique à la série suivante.
+
 ### Mode administration
 
 Un bouton ⚙ dans la barre supérieure bascule vers un éditeur de configuration (jours, sessions, exercices, séries, vélo, subExos).
@@ -72,11 +81,11 @@ Un bouton ⚙ dans la barre supérieure bascule vers un éditeur de configuratio
 
 ### Synchronisation Google Drive
 - Deux fichiers distincts sur Drive :
-  - `fitness_programme_semaine.json` — progression (checks + journal par semaine)
+  - `fitness_programme_semaine.json` — progression (checks + journal par semaine + slider d'intensité par exercice)
   - `fitness_programme_config.json` — configuration du programme (éditée via le mode admin)
 - Sync automatique après chaque action (debounce 2 s — plusieurs actions rapides = 1 seul envoi)
 - Fallback localStorage si hors ligne
-- Restauration silencieuse de session au rechargement de page
+- Restauration silencieuse de session au rechargement de page (prompt:'none')
 - En cas de conflit : les données Drive sont prioritaires sur le cache local
 
 ## Équipement requis

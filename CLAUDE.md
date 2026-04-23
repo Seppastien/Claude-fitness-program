@@ -6,7 +6,7 @@ Guide de développement pour Claude. Ce fichier décrit l'architecture, les conv
 
 ## Vue d'ensemble
 
-Fichier unique : `programme_semaine.html` (~3060 lignes).
+Fichier unique : `programme_semaine.html` (~3130 lignes).
 Aucune dépendance externe. Tout est en HTML/CSS/JS vanilla dans un seul fichier.
 
 Deux modes utilisateur cohabitent :
@@ -28,6 +28,8 @@ programme_semaine.html
     │                LIVE_CONFIG, CONFIG_STORAGE_KEY
     ├── CONFIG API   cloneDefaultConfig, isValidConfig, loadConfig, saveConfig,
     │                scheduleSaveConfig, loadConfigFromDrive, saveConfigToDrive
+    ├── SCALES       SCALES_STORAGE_KEY, EXERCISE_SCALES, loadScales,
+    │                getExerciseScale, saveScale (slider 50–150 %)
     ├── STATE        currentWeekOffset, activeDay, timers, serieTimers,
     │                modalState, driveState
     ├── GOOGLE DRIVE OAuth2, load/save Drive (progression + config séparés),
@@ -36,8 +38,10 @@ programme_semaine.html
     │                renderDayPanel, renderSeriesTracker, renderRepTracker,
     │                renderSubExoTracker, renderOverview, renderTabs
     ├── INTERACTIONS toggleEx, toggleVelo, setStar, setFeeling, saveJournalEntry,
-    │                syncExValidation, toggleSerieCheck, repSerieCheck
+    │                syncExValidation, toggleSerieCheck, repSerieCheck,
+    │                onExerciseScaleInput, onExerciseScaleChange
     ├── TIMERS       beep*, parseReps, parseRepSets, isDurationEx, fmtTime,
+    │                scaledSec, scaledSubSec, scaledRepsString,
     │                startAllSeries, startSerieTimer, tickSerieTimer,
     │                transitionToWork, finishWorkPhase, finishRestPhase,
     │                finalizeExerciseCompletion, resetSerieTimer
@@ -45,12 +49,13 @@ programme_semaine.html
     │                updateTimerModal, pauseModalTimer, skipModalTimer,
     │                resetModalTimer, findExerciseInfo, modalState, PREP_SECS
     ├── REPLI        toggleSession, toggleExCollapse
-    ├── WAKE LOCK    requestWakeLock() — empêche la mise en veille (Screen Wake Lock API)
-    ├── WEEK NAV     changeWeek, updateWeekDisplay, init()
-    └── ADMIN MODE   toggleAdminMode, renderAdminTree, renderAdminEditor,
-                     adminAdd/Move/Duplicate/Delete (Session|Exercise),
-                     adminSubExo*, adminConvertToCombined/Simple,
-                     adminExportConfig, adminImportConfig, adminResetConfig
+    ├── WEEK NAV     changeWeek, updateWeekDisplay
+    ├── ADMIN MODE   toggleAdminMode, renderAdminTree, renderAdminEditor,
+    │                adminAdd/Move/Duplicate/Delete (Session|Exercise),
+    │                adminSubExo*, adminConvertToCombined/Simple,
+    │                adminExportConfig, adminImportConfig, adminResetConfig
+    └── INIT         IIFE de boot : loadConfig → loadScales → rendu →
+                     tryRestoreToken (différé 800 ms) → Wake Lock
 ```
 
 ---
@@ -513,13 +518,14 @@ Ces IDs sont utilisés comme clés dans l'objet `serieTimers` et comme suffixes 
 Tout se joue dans l'IIFE `(function init(){…})()` à la fin du `<script>` :
 
 1. **`loadConfig()`** — hydrate `LIVE_CONFIG` depuis `localStorage` (ou `cloneDefaultConfig()` en fallback). DOIT précéder tout rendu : les fonctions de rendu lisent `LIVE_CONFIG`, pas les constantes figées.
-2. **Détection du jour courant** — `getDay()` (JS : 0=dim) est remappé via `dayMap = [6,0,1,2,3,4,5]` vers l'index dans `LIVE_CONFIG.days` (0=lun).
-3. **Rendu UI** — `updateWeekDisplay`, `renderAllPanels`, `renderTabs`, `renderOverview`.
-4. **Bind admin events** — `bindAdminTreeEvents()`, `bindAdminEditorEvents()` (nécessaires même en mode utilisateur : les containers admin existent déjà dans le DOM).
-5. **Différé 800 ms : `tryRestoreToken()`** — laisse la lib `gsi/client` finir son chargement asynchrone. Si un token valide existe, `loadFromDrive()` écrase `LIVE_CONFIG` (config Drive prioritaire) puis fusionne la progression, puis re-rend l'UI.
-6. **Wake Lock** — première demande + écoute `visibilitychange` pour redemander au retour d'onglet (le lock est automatiquement relâché quand l'onglet n'est plus visible).
+2. **`EXERCISE_SCALES = loadScales()`** — hydrate les scales utilisateur depuis `localStorage[SCALES_STORAGE_KEY]`. DOIT précéder tout rendu : les helpers `scaledSec` / `scaledSubSec` / `scaledRepsString` les lisent à chaque appel.
+3. **Détection du jour courant** — `getDay()` (JS : 0=dim) est remappé via `dayMap = [6,0,1,2,3,4,5]` vers l'index dans `LIVE_CONFIG.days` (0=lun).
+4. **Rendu UI** — `updateWeekDisplay`, `renderAllPanels`, `renderTabs`, `renderOverview`.
+5. **Bind admin events** — `bindAdminTreeEvents()`, `bindAdminEditorEvents()` (nécessaires même en mode utilisateur : les containers admin existent déjà dans le DOM).
+6. **Différé 800 ms : `tryRestoreToken()`** — laisse la lib `gsi/client` finir son chargement asynchrone. Si un token valide existe, `loadFromDrive()` écrase `LIVE_CONFIG` (config Drive prioritaire) puis fusionne la progression + les scales, puis re-rend l'UI.
+7. **Wake Lock** — première demande + écoute `visibilitychange` pour redemander au retour d'onglet (le lock est automatiquement relâché quand l'onglet n'est plus visible).
 
-> **Règle critique** : ne jamais déclencher un rendu avant l'étape 1. Sinon `LIVE_CONFIG` vaut son état post-module (un simple clone de `DEFAULT_CONFIG`) et une config utilisateur existante en localStorage est ignorée jusqu'au prochain boot.
+> **Règle critique** : ne jamais déclencher un rendu avant les étapes 1 et 2. Sinon `LIVE_CONFIG` vaut son état post-module (un simple clone de `DEFAULT_CONFIG`) et les scales utilisateur sont ignorés jusqu'au prochain boot.
 
 ---
 
