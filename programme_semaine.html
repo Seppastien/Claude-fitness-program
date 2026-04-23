@@ -1438,17 +1438,20 @@ function saveJournalEntry(dayId) {
 // ╔══════════════════════════════════════════════╗
 // ║  TIMERS & SERIES TRACKER                     ║
 // ╚══════════════════════════════════════════════╝
-// isDurationEx           → détecte durée vs reps (regex \d+\s*s|min sur ex.reps)
-// parseReps/parseRepSets → deux parseurs distincts (durée vs reps), doc CLAUDE.md
-// renderSeriesTracker    → trackers pour exercices en durée (simple ou /côté)
-// renderRepTracker       → trackers pour exercices en reps (simple ou /côté)
-// renderSubExoTracker    → trackers pour exercices combinés (Sphinx→Enfant)
-// repSerieCheck          → case série reps (3 états : cocher, annuler repos, décocher)
+// isDurationEx              → détecte durée vs reps (regex \d+\s*s|min sur ex.reps)
+// parseReps/parseRepSets    → deux parseurs distincts (durée vs reps), doc CLAUDE.md
+// renderSeriesTracker       → trackers pour exercices en durée (simple ou /côté)
+// renderRepTracker          → trackers pour exercices en reps (simple ou /côté)
+// renderSubExoTracker       → trackers pour exercices combinés (Sphinx→Enfant)
+// repSerieCheck             → case série reps (3 états : cocher+repos, annuler repos, décocher)
 // beep* / playExerciseCompleteSound → Web Audio API (phases + fanfares fin)
+// startAllSeries            → bouton "▶ Lancer toutes les séries" (durée uniquement)
 // startSerieTimer + tickSerieTimer + transitionToWork + finishWorkPhase +
-//   finishRestPhase + resetSerieTimer → cycle 3 phases prep→work→rest
-// openTimerModal + closeTimerModal + updateTimerModal + pauseModalTimer +
-//   skipModalTimer + resetModalTimer → modale plein écran liée au timer actif
+//   finishRestPhase + finalizeExerciseCompletion + resetSerieTimer
+//   → cycle 3 phases prep→work→rest + repli auto exercice/séance en fin
+// openTimerModal + openRepRestModal + closeTimerModal + updateTimerModal +
+//   pauseModalTimer + skipModalTimer + resetModalTimer
+//   → modale plein écran (durée : toutes phases ; reps : repos uniquement)
 
 function fmtTime(s) {
   return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
@@ -1748,13 +1751,13 @@ function repSerieCheck(sid, restSec, isLast) {
 // Un sid absent ou à null = timer non démarré (ou déjà terminé/reset).
 const serieTimers = {};
 
-// ── TIMER MODAL (overlay plein écran affiché pendant une série en durée) ──
-// Affiche résumé exercice/série, numéro de série, temps restant, et expose
-// 3 actions utilisateur : pause/reprise, saut (valide la série en work),
-// reset (annule la série, ne valide pas). Un seul timer peut être actif ;
-// modalState trace le sid courant pour ignorer tout update provenant
-// d'un autre tracker encore en vie.
-// PREP_SECS : phase de préparation avant chaque série (bip à chaque seconde).
+// ── TIMER MODAL (overlay plein écran) ──
+// Utilisée dans deux contextes :
+//   openTimerModal   → série en durée (phases prep/work/rest, enchaînement auto)
+//   openRepRestModal → repos après une série en reps (phase rest uniquement)
+// Dans les deux cas : résumé exercice/série + 3 actions pause/skip/reset.
+// modalState.isRepRest distingue les deux contextes (skip/reset branchent différemment).
+// PREP_SECS : phase de préparation avant chaque série en durée (bip à chaque seconde).
 const PREP_SECS = 3;
 const modalState = { sid: null, active: false, isRepRest: false };
 
@@ -1802,6 +1805,9 @@ function openTimerModal(sid) {
   modal.setAttribute('aria-hidden', 'false');
 }
 
+// openRepRestModal : variante de openTimerModal pour les exercices en reps.
+// Affiche la modale en phase 'rest' uniquement — pause/skip/reset gèrent
+// le timer de repos (serieTimers[sid].isRepRest = true). Appelé par repSerieCheck.
 function openRepRestModal(sid) {
   const chk = document.getElementById('schk_'+sid);
   if (!chk) return;
@@ -2072,8 +2078,9 @@ function finishWorkPhase(sid) {
   updateTimerModal(sid, 'rest', st.restSec);
 }
 
-// Replie l'exercice courant après 800 ms puis déplie le suivant. Si c'est le
-// dernier exercice de la séance, replie également la carte de séance.
+// finalizeExerciseCompletion : appelé après validation de la dernière série (durée ou reps).
+// Replie l'exercice courant après 800 ms puis déplie le suivant.
+// Si aucun suivant (dernier exercice de la séance), replie la carte de session.
 function finalizeExerciseCompletion(anchor) {
   if (!anchor) return;
   const exItem = anchor.closest ? anchor.closest('.ex-item') : null;

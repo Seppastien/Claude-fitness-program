@@ -6,7 +6,7 @@ Guide de développement pour Claude. Ce fichier décrit l'architecture, les conv
 
 ## Vue d'ensemble
 
-Fichier unique : `programme_semaine.html` (~2700 lignes).
+Fichier unique : `programme_semaine.html` (~3060 lignes).
 Aucune dépendance externe. Tout est en HTML/CSS/JS vanilla dans un seul fichier.
 
 Deux modes utilisateur cohabitent :
@@ -38,11 +38,12 @@ programme_semaine.html
     ├── INTERACTIONS toggleEx, toggleVelo, setStar, setFeeling, saveJournalEntry,
     │                syncExValidation, toggleSerieCheck, repSerieCheck
     ├── TIMERS       beep*, parseReps, parseRepSets, isDurationEx, fmtTime,
-    │                startSerieTimer, tickSerieTimer, transitionToWork,
-    │                finishWorkPhase, finishRestPhase, resetSerieTimer
-    ├── TIMER MODAL  openTimerModal, closeTimerModal, updateTimerModal,
-    │                pauseModalTimer, skipModalTimer, resetModalTimer,
-    │                findExerciseInfo, modalState, PREP_SECS
+    │                startAllSeries, startSerieTimer, tickSerieTimer,
+    │                transitionToWork, finishWorkPhase, finishRestPhase,
+    │                finalizeExerciseCompletion, resetSerieTimer
+    ├── TIMER MODAL  openTimerModal, openRepRestModal, closeTimerModal,
+    │                updateTimerModal, pauseModalTimer, skipModalTimer,
+    │                resetModalTimer, findExerciseInfo, modalState, PREP_SECS
     ├── REPLI        toggleSession, toggleExCollapse
     ├── WAKE LOCK    requestWakeLock() — empêche la mise en veille (Screen Wake Lock API)
     ├── WEEK NAV     changeWeek, updateWeekDisplay, init()
@@ -96,9 +97,10 @@ LIVE_CONFIG.sessions = {
   name: 'string',
   desc: 'string',
   reps: 'string',             // ex: '3 × 12', '2 × 40 s /côté', '3 min'
-  sec: number,                // durée TOTALE du timer (tous côtés, toutes séries)
+  sec: number,                // durée TOTALE du timer (tous côtés, toutes séries) — exercices en durée uniquement
   type: 'gainage|etirement|cardio|muscu|yoga',
   charge: 'string optionnel', // ex: '2×2 kg'
+  restSec: number,            // repos en secondes après chaque série (reps uniquement) — défaut 60 si absent
   serieInfo: 'string optionnel', // description affichée UNE FOIS en haut du bloc
   url: 'string optionnel',    // lien fiche technique externe — affiche ↗ dans le nom
   sets: number,               // uniquement pour subExos
@@ -214,13 +216,19 @@ const exCollapsed = !!checked || firstOpenExFound;
 if (!checked && !firstOpenExFound) firstOpenExFound = true;
 ```
 
-Quand un exercice en durée (`startSerieTimer`) atteint la dernière série, il se replie automatiquement après 800 ms et déplie le suivant :
+Quand un exercice est terminé (durée ou reps), `finalizeExerciseCompletion(anchor)` est appelé après validation de la dernière série. Il replie l'exercice courant après 800 ms et déplie le suivant. Si c'est le dernier exercice de la séance, il replie également la carte de session :
 
 ```javascript
+// finalizeExerciseCompletion(anchor)
 setTimeout(() => {
   exItem.classList.add('collapsed');
   const next = exItem.nextElementSibling;
-  if (next && next.classList.contains('ex-item')) next.classList.remove('collapsed');
+  if (next && next.classList.contains('ex-item')) {
+    next.classList.remove('collapsed');
+  } else {
+    const sessionCard = exItem.closest('.session-card');
+    if (sessionCard) sessionCard.classList.add('collapsed');
+  }
 }, 800);
 ```
 
@@ -247,15 +255,9 @@ Sens inverse (`toggleEx`) : cocher/décocher l'exercice directement (case princi
 | `work` | `secPerSet` | `beepHalf()` à mi-temps, `beepEnd()` en fin | `finishWorkPhase` → coche la série, puis `rest` (ou fin si dernière série) |
 | `rest` | `restSec` | `beepRestEnd()` en fin | `finishRestPhase` → auto-clic sur le bouton de la série suivante |
 
-Chaque série d'un exercice en durée suit donc **prep → work → rest → prep (série suivante)…** entièrement automatique une fois le premier démarrage lancé. À la dernière série, `finishWorkPhase` ferme la modale, replie l'exercice après 800 ms et ouvre le suivant :
+Chaque série d'un exercice en durée suit donc **prep → work → rest → prep (série suivante)…** entièrement automatique une fois le premier démarrage lancé. À la dernière série, `finishRestPhase` ferme la modale et appelle `finalizeExerciseCompletion` pour replier l'exercice après 800 ms et ouvrir le suivant (ou replier la séance si dernier exercice).
 
-```javascript
-setTimeout(() => {
-  exItem.classList.add('collapsed');
-  const next = exItem.nextElementSibling;
-  if (next && next.classList.contains('ex-item')) next.classList.remove('collapsed');
-}, 800);
-```
+Le bouton **▶ Lancer toutes les séries** (généré par `renderSeriesTracker` et `renderSubExoTracker`) appelle `startAllSeries(dayId, exId)` : il trouve la première série non terminée et simule un clic sur son bouton — l'enchaînement automatique prend la suite.
 
 L'enchaînement série suivante se fait via `.click()` sur le bouton du tracker :
 
@@ -270,27 +272,30 @@ if (serieIdx + 1 < totalSets) {
 
 ## Modale timer plein écran
 
-Pendant une série en durée, une modale `#timer-modal` s'affiche par-dessus l'app (masquée en `body.admin-mode`). Elle rappelle l'exercice en cours et expose trois actions utilisateur.
+La modale `#timer-modal` s'affiche par-dessus l'app dans deux cas (masquée en `body.admin-mode`) :
+- **Pendant une série en durée** : phases prep / work / rest avec contrôles pause/skip/reset.
+- **Pendant le repos d'une série en reps** : affiche uniquement la phase `rest` avec les mêmes contrôles.
 
 ### État
 
 ```javascript
-const modalState = { sid: null, active: false };
+const modalState = { sid: null, active: false, isRepRest: false };
 ```
 
-Un seul timer peut être visible à la fois : la modale est liée au `sid` actif, et `updateTimerModal(sid, ...)` ignore tout appel concernant un autre `sid`.
+`isRepRest` distingue les deux contextes d'utilisation : `skipModalTimer` et `resetModalTimer` branchent différemment selon cette valeur. Un seul timer peut être visible à la fois : `updateTimerModal(sid, ...)` ignore tout appel concernant un `sid` différent du `sid` actif.
 
 ### API
 
 | Fonction | Rôle |
 |----------|------|
-| `openTimerModal(sid)` | Résout l'exercice via `findExerciseInfo(dayId, exId)`, remplit nom/desc/libellé série/reps, réinitialise le bouton pause, affiche la modale |
-| `closeTimerModal()` | Masque la modale, remet `modalState` à zéro |
+| `openTimerModal(sid)` | Résout l'exercice via `findExerciseInfo`, remplit nom/desc/libellé série/reps, affiche la modale — utilisé pour les séries en durée |
+| `openRepRestModal(sid)` | Même remplissage que `openTimerModal` mais pose `modalState.isRepRest = true` — utilisé par `repSerieCheck` pendant le repos |
+| `closeTimerModal()` | Masque la modale, remet `modalState` à zéro (sid, active, isRepRest) |
 | `updateTimerModal(sid, phaseType, remaining)` | Met à jour le libellé de phase (`prep`/`work`/`rest`) et le compteur. En `prep`, le chiffre est agrandi (classe `.big`) |
 | `pauseModalTimer()` | Toggle `st.paused` — le tick ignore les secondes pendant la pause |
-| `skipModalTimer()` | Force la fin de la phase courante : `prep`→`transitionToWork`, `work`→`finishWorkPhase`, `rest`→`finishRestPhase` |
-| `resetModalTimer()` | Appelle `resetSerieTimer(sid)` puis `closeTimerModal()` |
-| `resetSerieTimer(sid)` | Nettoie l'interval, remet le bouton du tracker à son état initial |
+| `skipModalTimer()` | Force la fin de la phase courante. Si `isRepRest` : saute le repos et appelle `syncExValidation`/`finalizeExerciseCompletion` si c'était la dernière série. Sinon : `prep`→`transitionToWork`, `work`→`finishWorkPhase`, `rest`→`finishRestPhase` |
+| `resetModalTimer()` | Si `isRepRest` : annule le timer de repos et ferme. Sinon : `resetSerieTimer(sid)` + ferme |
+| `resetSerieTimer(sid)` | Nettoie l'interval d'une série en durée, remet le bouton du tracker à son état initial |
 
 ### Points d'attention
 
@@ -318,9 +323,11 @@ Deux fonctions distinctes selon le contexte :
 
 La case d'une série reps a **trois comportements** selon l'état courant :
 
-1. **Non cochée, pas de timer** → coche, lance le décompte de repos (sauf dernière série).
-2. **Cochée, timer en cours** → annule le timer de repos, remet l'affichage à zéro.
+1. **Non cochée, pas de timer** → coche, lance le décompte de repos via `openRepRestModal` (modale overlay, même contrôles que le timer durée), sauf sur la dernière série où le repos est quand même lancé — c'est `finishRestPhase` équivalent qui appelle `syncExValidation` + `finalizeExerciseCompletion` en fin de repos.
+2. **Cochée, timer en cours** → annule le timer de repos, ferme la modale, remet l'affichage à zéro.
 3. **Cochée, pas de timer** → décoche (permet la correction manuelle).
+
+La durée du repos est lue depuis `ex.restSec` si défini, sinon 60 s par défaut.
 
 ---
 
@@ -526,6 +533,7 @@ Tout se joue dans l'IIFE `(function init(){…})()` à la fin du `<script>` :
 - **Après modification** : commit + push GitHub Desktop → attendre 1-2 min pour GitHub Pages
 - **parseRepSets** : ne jamais mettre un format `"N × texte"` où N > 1 si c'est une seule série — ça créerait N fausses séries
 - **Ajouter un subExo** : `sets` doit être défini sur l'exercice parent ; le repos entre cycles (fin de chaque cycle complet) est 15 s — entre les postures d'un même cycle : 0 s
+- **Modifier le temps de repos (reps)** : utiliser le champ `restSec` sur l'exercice (ex: `restSec: 30`). Sans ce champ, la valeur par défaut est 60 s. Le champ n'est pas éditable depuis l'admin — modifier directement dans `DEFAULT_CONFIG`.
 - **Modifier les données par défaut** : éditer `DEFAULT_CONFIG` — c'est la seule source figée dans le code. `LIVE_CONFIG` est mutable et reflète la config utilisateur
 - **Ajouter une phase au timer** : la transition doit être gérée dans `tickSerieTimer` + `transitionTo*`/`finish*Phase` ET dans `skipModalTimer` (sinon le bouton ⏭ devient incohérent)
 - **Nouveau libellé de phase** : ajouter la clé dans l'objet `labels` de `updateTimerModal` et la classe CSS correspondante (`.tm-phase.<nom>`)

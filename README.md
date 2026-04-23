@@ -25,14 +25,14 @@ L'interface adapte automatiquement ce qui est affiché selon l'avancement :
   - Double bip médium — mi-temps
   - Triple bip grave — fin de série
   - Bip aigu montant — fin du temps de repos
-  - **Enchaînement automatique** : à la fin du repos, la série suivante démarre sans intervention (prep → work → rest → prep…)
-  - À la fin de la dernière série : l'exercice se coche, la modale se ferme et l'exercice suivant s'ouvre
+  - **Bouton ▶ Lancer toutes les séries** : démarre la première série non terminée ; l'enchaînement automatique prend la suite (prep → work → rest → prep…)
+  - À la fin de la dernière série : l'exercice se coche, la modale se ferme, l'exercice suivant s'ouvre (ou la séance se replie si c'était le dernier)
   - **Modale timer** (plein écran) : rappelle le nom de l'exercice, sa description, le libellé de série et la consigne (reps/durée). Trois actions sont exposées :
     - **⏸ Pause / ▶ Reprendre** — fige le décompte de la phase en cours
     - **⏭ Sauter** — termine immédiatement la phase courante (prep→work, work→rest+valide la série, rest→série suivante)
     - **⏹ Reset** — annule la série en cours et ferme la modale
-- **Exercices en répétitions** : case à cocher par série + timer de repos (60 s) déclenché automatiquement à la validation
-  - Cliquer à nouveau pendant le repos annule le décompte
+- **Exercices en répétitions** : case à cocher par série + timer de repos (durée configurable, 60 s par défaut) déclenché automatiquement à la validation, avec une modale overlay identique à celle des exercices en durée (pause, saut, reset disponibles pendant le repos)
+  - Cliquer à nouveau pendant le repos annule le décompte et ferme la modale
   - Cliquer sur une série déjà cochée (hors repos) la décoche (correction)
 - **Exercices latéraux** (`/côté`) : lignes séparées Gauche / Droite avec timer individuel par côté — le repos ne se déclenche qu'après le second côté
 - **Exercices alternés continus** (crunch bicycle, superman, planche tap) : séries simples sans séparation gauche/droite — serieInfo indique le total de cycles
