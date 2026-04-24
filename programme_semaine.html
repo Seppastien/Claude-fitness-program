@@ -795,6 +795,26 @@ function handleSyncBtn() {
 }
 
 // ── Auth Google ──
+
+// Stocke le token avec son expiry (3500 s ≈ 58 min, marge sur les 3600 s Google).
+function saveTokenToStorage(token) {
+  try {
+    localStorage.setItem('fitness_drive_token', JSON.stringify({
+      token, expiry: Date.now() + 3500 * 1000
+    }));
+  } catch {}
+}
+
+// Lit le token stocké. Gère l'ancien format (string brute sans expiry).
+function getStoredToken() {
+  try {
+    const raw = localStorage.getItem('fitness_drive_token');
+    if (!raw) return null;
+    if (raw.startsWith('{')) return JSON.parse(raw);
+    return { token: raw, expiry: 0 }; // ancien format → considéré expiré
+  } catch { return null; }
+}
+
 function initGoogleAuth() {
   if (!window.google || !GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith('VOTRE')) {
     alert('⚙️ Configure ton Client ID Google dans le fichier HTML.\nConsulte le guide de configuration fourni.');
@@ -807,7 +827,7 @@ function initGoogleAuth() {
       if (resp.error) { setSyncUI('error', 'Erreur de connexion Google'); return; }
       driveState.accessToken = resp.access_token;
       driveState.connected = true;
-      localStorage.setItem('fitness_drive_token', resp.access_token);
+      saveTokenToStorage(resp.access_token);
       setSyncUI('syncing', 'Chargement des données Drive…');
       await loadFromDrive();
     }
@@ -815,19 +835,38 @@ function initGoogleAuth() {
 }
 
 function tryRestoreToken() {
-  const saved = localStorage.getItem('fitness_drive_token');
-  if (!saved || !window.google || !GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith('VOTRE')) return;
+  const stored = getStoredToken();
+  if (!stored || !window.google || !GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith('VOTRE')) return;
+
+  // Token encore valide (2 min de marge) → réutilisation directe, sans popup ni réseau auth.
+  if (stored.expiry > Date.now() + 120 * 1000) {
+    driveState.accessToken = stored.token;
+    driveState.connected = true;
+    setSyncUI('syncing', 'Restauration session Drive…');
+    loadFromDrive();
+    return;
+  }
+
+  // Token expiré → tentative de refresh silencieux via la session Google active.
   try {
     google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CLIENT_ID, scope: DRIVE_SCOPE, prompt: 'none',
       callback: async (resp) => {
         if (resp.error || !resp.access_token) {
-          setSyncUI('error', 'Session Drive expirée — reconnecte-toi');
+          // interaction_required / consent_required = session Google inactive,
+          // pas une vraie erreur. On affiche juste le bouton de connexion.
+          const needsInteraction = ['interaction_required', 'consent_required', 'login_required']
+            .includes(resp.error);
+          if (needsInteraction) {
+            setSyncUI('', 'Drive non connecté');
+          } else {
+            setSyncUI('error', 'Session Drive expirée — reconnecte-toi');
+          }
           return;
         }
         driveState.accessToken = resp.access_token;
         driveState.connected = true;
-        localStorage.setItem('fitness_drive_token', resp.access_token);
+        saveTokenToStorage(resp.access_token);
         setSyncUI('syncing', 'Restauration session Drive…');
         await loadFromDrive();
       }
