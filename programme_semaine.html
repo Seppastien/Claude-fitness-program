@@ -101,13 +101,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .ex-desc{font-size:11.5px;color:var(--muted);line-height:1.5;font-weight:300;margin-top:2px}
 .ex-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
 .ex-reps{font-family:'DM Mono',monospace;font-size:11px;background:var(--surface2);padding:2px 8px;border-radius:5px;white-space:nowrap}
-.type-dot{width:6px;height:6px;border-radius:50%;margin-top:6px}
-.dot-gainage{background:#4A5FA8}
-.dot-etirement{background:#2E6E4E}
-.dot-cardio{background:#B84040}
-.dot-velo{background:#B8890A}
-.dot-muscu{background:#7A4FA8}
-.dot-yoga{background:#C0607A}
+
 
 /* Timer */
 .timer-btn{border:1px solid var(--border2);background:none;border-radius:20px;padding:2px 9px;font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;color:var(--muted);display:flex;align-items:center;gap:4px;white-space:nowrap;transition:all .15s}
@@ -214,6 +208,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .diff-facile{background:#EAF4F8;color:#2F6B85;border:1px solid rgba(47,107,133,.25)}
 .diff-modere{background:#FDF5E0;color:#7A5800;border:1px solid rgba(122,88,0,.25)}
 .diff-soutenu{background:#FDECE8;color:#A03020;border:1px solid rgba(160,48,32,.25)}
+
+/* ── Badges de type d'exercice ── */
+.ex-type-badge{font-family:'DM Mono',monospace;font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:10px;white-space:nowrap;letter-spacing:.3px;text-transform:uppercase;flex-shrink:0}
+.etbadge-gainage{background:#ECEFFE;color:#3A4FA8;border:1px solid rgba(58,79,168,.2)}
+.etbadge-etirement{background:#E8F4EE;color:#2E6E4E;border:1px solid rgba(46,110,78,.2)}
+.etbadge-cardio{background:#FDECEC;color:#A03020;border:1px solid rgba(160,48,32,.2)}
+.etbadge-muscu{background:#F0EAFA;color:#6A35A8;border:1px solid rgba(106,53,168,.2)}
+.etbadge-yoga{background:#FAEAF0;color:#A03060;border:1px solid rgba(160,48,96,.2)}
+.etbadge-velo{background:#FDF5E0;color:#7A5800;border:1px solid rgba(122,88,0,.2)}
+.session-kcal{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)}
 
 /* ── Slider d'intensité par exercice ── */
 .scale-badge{font-family:'DM Mono',monospace;font-size:10px;background:#EAF4F8;color:#2F6B85;border:1px solid rgba(47,107,133,.2);padding:2px 7px;border-radius:5px;white-space:nowrap}
@@ -434,6 +438,7 @@ const DAYS = [
 
 const TYPE_LABELS = { bureau:'Bureau + Vélo', tele:'Télétravail', weekend:'Week-end' };
 const TYPE_COLORS = { bureau:'bureau', tele:'tele', weekend:'weekend' };
+const EX_TYPE_LABELS = { gainage:'Gainage', etirement:'Étirement', cardio:'Cardio', muscu:'Muscu', yoga:'Yoga', velo:'Vélo' };
 
 // SESSIONS — Séances livrées par défaut, indexées par type de jour.
 //   bureau  : Lun / Mer / Ven (matin + vélo aller/retour + soir)
@@ -446,7 +451,7 @@ const SESSIONS = {
   bureau: [
     {
       id:'matin_bureau', emoji:'🌅', title:'Matin — Activation lombaire',
-      desc:'Avant le vélo · 20–23 min', duration:'20–23 min', difficulte:'Facile',
+      desc:'Avant le vélo · 20–23 min', duration:'20–23 min', difficulte:'Facile', kcal:90,
       exercises:[
         {id:'b_m1', name:'Respiration diaphragmatique', desc:'Allongé, gonfle le ventre, tiens 5 s. Active le transverse.', reps:'10 souffles', sec:90, type:'gainage', serieInfo:'10 souffles · inspire 4 s · tenu 5 s · expire 6 s', url:'https://www.souffle-et-respire.fr/respiration-diaphragmatique-bienfaits-exercices-guide-complet-2026/'},
         {id:'b_m2', name:'Knee-to-chest', desc:'Genoux ramenés vers la poitrine, maintiens doucement 30 s. Décompresse les lombaires.', reps:'3 × 30 s', sec:90, type:'etirement', url:'https://www.yogapage.com/apanasana-la-pression-abdominale-fiche-posture/'},
@@ -461,17 +466,17 @@ const SESSIONS = {
       id:'velo_matin', emoji:'🚴', title:'Vélo — Trajet aller',
       desc:'Trajet domicile → bureau · cardio modéré', duration:'~30 min',
       isVelo:true, veloDir:'aller',
-      veloStats:{ km:10, duree:'~30 min', cal:'~220 kcal', difficulte:'Modéré' }
+      veloStats:{ km:10, duree:'25 min', cal:'~380 kcal', difficulte:'Soutenu' }
     },
     {
       id:'velo_soir', emoji:'🚴', title:'Vélo — Trajet retour',
       desc:'Trajet bureau → domicile · cardio fin de journée', duration:'~30 min',
       isVelo:true, veloDir:'retour',
-      veloStats:{ km:10, duree:'~30 min', cal:'~220 kcal', difficulte:'Modéré' }
+      veloStats:{ km:10, duree:'25 min', cal:'~380 kcal', difficulte:'Soutenu' }
     },
     {
       id:'soir_bureau', emoji:'🌙', title:'Soir — Décompression lombaire',
-      desc:'Après le vélo retour · 11–13 min', duration:'11–13 min', difficulte:'Doux',
+      desc:'Après le vélo retour · 11–13 min', duration:'11–13 min', difficulte:'Doux', kcal:35,
       exercises:[
         {id:'b_s1', name:'Étirement psoas (fente basse)', desc:'Genou arrière au sol, avance le bassin. Contre le raccourcissement après vélo + position assise.', reps:'3 × 40 s /côté', sec:240, type:'etirement', url:'https://asanas.fr/postures-yoga/fente-basse-anjaneyasana'},
         {id:'b_s2', name:'Piriforme figure 4', desc:'Allongé, cheville sur le genou opposé, tire la jambe. Libère hanches et bas du dos.', reps:'2 × 45 s /côté', sec:180, type:'etirement', url:'https://asanas.fr/postures-yoga/pigeon-ardha-kapotasana'},
@@ -484,7 +489,7 @@ const SESSIONS = {
   tele: [
     {
       id:'matin_tele', emoji:'🌅', title:'Matin — Activation & gainage profond',
-      desc:'Avant le début du travail · 20–23 min', duration:'20–23 min', difficulte:'Modéré',
+      desc:'Avant le début du travail · 20–23 min', duration:'20–23 min', difficulte:'Modéré', kcal:110,
       exercises:[
         {id:'t_m1', name:'Respiration + activation transverse', desc:'Expire fort, rentre le ventre, tiens 5 s. Active le corset naturel.', reps:'10 souffles', sec:90, type:'gainage', serieInfo:'10 souffles · expire fort · tenu 5 s · relâche 4 s', url:'https://www.souffle-et-respire.fr/respiration-diaphragmatique-bienfaits-exercices-guide-complet-2026/'},
         {id:'t_m2', name:'Dead Bug', desc:'Bras vers plafond, genoux 90°. Descends bras+jambe opposée. Dos plaqué au sol.', reps:'3 × 10', sec:288, type:'gainage', restSec:30, serieInfo:'5 reps/côté alternés · descente 3 s · remontée 2 s', url:'https://jemeremetsausport.com/dead-bug/'},
@@ -496,7 +501,7 @@ const SESSIONS = {
     },
     {
       id:'midi_tele', emoji:'☀️', title:'Midi — Circuit abdo + activation cardio',
-      desc:'Pause déjeuner · sans saut, sans impact · 16–18 min', duration:'16–18 min', difficulte:'Modéré',
+      desc:'Pause déjeuner · sans saut, sans impact · 16–18 min', duration:'16–18 min', difficulte:'Modéré', kcal:90,
       exercises:[
         {id:'t_mi1', name:'Step touch dynamique', desc:'Pas latéraux rapides avec bras actifs (ouverture/fermeture en rythme). Cardio sans impact ni saut, silencieux, adapté appartement.', reps:'3 min', sec:180, type:'cardio', url:'https://www.my15minutechallenge.com/exercices/step-touch/'},
         {id:'t_mi2', name:'Crunch bicycle', desc:'Coude vers genou opposé en alternance, lent et contrôlé. Pas de coup de nuque.', reps:'3 × 10', sec:216, type:'gainage', restSec:30, serieInfo:'10 cycles alternés · 2 s par cycle · sans à-coup', url:'https://jemeremetsausport.com/crunch-bicycle/'},
@@ -509,7 +514,7 @@ const SESSIONS = {
     },
     {
       id:'soir_tele', emoji:'🌙', title:'Soir — Gainage intense + décompression',
-      desc:'Fin de journée · 18–20 min', duration:'18–20 min', difficulte:'Soutenu',
+      desc:'Fin de journée · 18–20 min', duration:'18–20 min', difficulte:'Soutenu', kcal:115,
       exercises:[
         {id:'t_s1', name:'Planche dynamique (épaule-épaule)', desc:'En planche, touche l\'épaule opposée en alternance. Anti-rotation des abdos.', reps:'3 × 12 tap', sec:90, type:'gainage', restSec:30, serieInfo:'12 taps alternés · 2 s par tap · hanches stables', url:'https://fitdistance.io/exercice-musculation/planche-touche-epaule'},
         {id:'t_s2', name:'Crunch jambes tendues', desc:'Jambes à 90°, monte les épaules sans balancer. Contracte fort en haut.', reps:'3 × 8', sec:90, type:'gainage', restSec:30, serieInfo:'8 reps · montée 1 s · tenu 1 s · descente 2 s', url:'https://fitdistance.io/exercice-musculation/crunchs-jambes-tendues'},
@@ -527,7 +532,7 @@ const SESSIONS = {
     sam: [
       {
         id:'echauffement_sam', emoji:'🔥', title:'Échauffement général',
-        desc:'Activation articulaire + cardio doux · 7–10 min', duration:'7–10 min', difficulte:'Facile',
+        desc:'Activation articulaire + cardio doux · 7–10 min', duration:'7–10 min', difficulte:'Facile', kcal:40,
         exercises:[
           {id:'s_e1', name:'Marche sur place genoux hauts', desc:'Lève les genoux à hauteur de bassin en alternance, bras actifs. Monte le rythme cardiaque progressivement.', reps:'2 min', sec:120, type:'cardio', url:'https://jemeremetsausport.com/montees-de-genoux/'},
           {id:'s_e2', name:'Cercles épaules avant/arrière', desc:'Bras tendus, grands cercles lents. Mobilise l\'articulation gléno-humérale avant l\'effort.', reps:'10 × chaque sens', sec:60, type:'etirement', serieInfo:'10 cercles avant + 10 arrière · amplitude max · lent', url:'https://smartworkout.app/fr/bibliotheque-d-exercices/epaules/cercles-d\'epaules'},
@@ -538,7 +543,7 @@ const SESSIONS = {
       },
       {
         id:'gainage_pre_sam', emoji:'🧱', title:'Gainage pré-musculation',
-        desc:'Stabilise le dos avant les charges · 17–20 min', duration:'17–20 min', difficulte:'Modéré',
+        desc:'Stabilise le dos avant les charges · 17–20 min', duration:'17–20 min', difficulte:'Modéré', kcal:90,
         exercises:[
           {id:'s_g1', name:'Dead Bug', desc:'Bras vers plafond, genoux 90°. Descends bras+jambe opposée lentement. Dos plaqué. Active les stabilisateurs profonds avant les haltères.', reps:'3 × 10', sec:288, type:'gainage', restSec:30, serieInfo:'5 reps/côté alternés · descente 3 s · remontée 2 s', url:'https://jemeremetsausport.com/dead-bug/'},
           {id:'s_g2', name:'Bird Dog', desc:'À 4 pattes, bras et jambe opposée tendus 3 s. Prépare le gainage lombaire pour les exercices debout.', reps:'3 × 10', sec:288, type:'gainage', restSec:30, serieInfo:'5 reps/côté alternés · tenu 3 s · retour contrôlé', url:'https://jemeremetsausport.com/bird-dog/'},
@@ -548,7 +553,7 @@ const SESSIONS = {
       },
       {
         id:'muscu_sam', emoji:'🏋️', title:'Musculation — Haut du corps',
-        desc:'Banc + haltères · progression douce · 45–55 min', duration:'45–55 min', difficulte:'Soutenu',
+        desc:'Banc + haltères · progression douce · 45–55 min', duration:'45–55 min', difficulte:'Soutenu', kcal:310,
         isMuscu: true,
         note:'Débutant / reprise : commencer léger (2 kg par haltère). Augmenter les disques uniquement quand les 12 reps sont fluides sur 3 séries. Repos 60–90 s entre séries.',
         exercises:[
@@ -564,7 +569,7 @@ const SESSIONS = {
       },
       {
         id:'gainage_post_sam', emoji:'🧘', title:'Gainage post-effort + étirements',
-        desc:'Retour au calme · récupération active · 13–15 min', duration:'13–15 min', difficulte:'Facile',
+        desc:'Retour au calme · récupération active · 13–15 min', duration:'13–15 min', difficulte:'Facile', kcal:50,
         exercises:[
           {id:'s_p1', name:'Side Plank statique', desc:'Après l\'effort, le gainage latéral consolide ce que la musculation a travaillé. Corps aligné, hanches levées.', reps:'2 × 12 s /côté', sec:48, type:'gainage', restSec:30, serieInfo:'12 s/côté · respiration régulière', url:'https://jemeremetsausport.com/elevations-de-hanches-en-planche-laterale/'},
           {id:'s_p2', name:'Étirement pectoraux (angle mur)', desc:'Avant-bras contre un encadrement de porte, penche doucement le thorax vers l\'avant. Ouverture pectorale post-développé.', reps:'2 × 40 s /côté', sec:160, type:'etirement', url:'https://fitdistance.io/exercice-musculation/etirement-des-pectoraux-entre-2-portes'},
@@ -579,7 +584,7 @@ const SESSIONS = {
     dim: [
       {
         id:'yoga_dim', emoji:'🧘', title:'Yoga doux — Récupération active',
-        desc:'Adapté dos raide + ventre proéminent · sans flexions profondes · 35–45 min', duration:'35–45 min', difficulte:'Doux',
+        desc:'Adapté dos raide + ventre proéminent · sans flexions profondes · 35–45 min', duration:'35–45 min', difficulte:'Doux', kcal:120,
         isYoga: true,
         note:'Toutes les postures ont une alternative plus accessible. Ne force jamais dans la douleur — l\'inconfort doux est normal, la douleur ne l\'est pas. Respire profondément sur chaque posture.',
         exercises:[
@@ -1206,11 +1211,13 @@ function renderDayPanel(day) {
   let totalMin = 0, totalKm = 0, totalKcal = 0;
   if (sessions) {
     sessions.forEach(s => {
-      if (s.isVelo) { totalKm += 10; totalKcal += 220; totalMin += 30; }
-      else if (s.exercises) {
-        const mins = parseInt(s.duration)||0;
-        totalMin += (parseInt(s.duration)||20);
-        totalKcal += Math.round((parseInt(s.duration)||20) * 2.5);
+      if (s.isVelo) {
+        totalKm += s.veloStats.km || 10;
+        totalMin += parseInt(s.veloStats.duree) || 25;
+        totalKcal += parseInt((s.veloStats.cal||'').replace(/[^\d]/g,'')) || 380;
+      } else if (s.exercises) {
+        totalMin += parseInt(s.duration) || 20;
+        totalKcal += s.kcal || Math.round((parseInt(s.duration)||20) * 4);
       }
     });
   }
@@ -1285,7 +1292,7 @@ function renderDayPanel(day) {
                   <span class="ex-reps" id="sreps_${day.id}_${ex.id}">${scaledRepsString(ex)}</span>
                   ${ex.charge ? `<span class="charge-tag">${ex.charge}</span>` : ''}
                   ${scaleBadge}
-                  <div class="type-dot dot-${ex.type}"></div>
+                  <span class="ex-type-badge etbadge-${ex.type}">${EX_TYPE_LABELS[ex.type]||ex.type}</span>
                 </div>
                 <button class="ex-toggle">▾</button>
               </div>
@@ -1304,11 +1311,12 @@ function renderDayPanel(day) {
               <div class="session-title">${s.title}</div>
               <div class="session-meta">${s.desc}</div>
             </div>
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
               <div style="display:flex;align-items:center;gap:6px">
                 <div class="session-duration">${s.duration}</div>
                 ${s.difficulte ? `<span class="diff-badge diff-${({'Doux':'doux','Facile':'facile','Modéré':'modere','Soutenu':'soutenu'})[s.difficulte]||'facile'}">${s.difficulte}</span>` : ''}
               </div>
+              ${s.kcal ? `<span class="session-kcal">~${s.kcal} kcal</span>` : ''}
               <span class="session-done-badge ${allDone?'visible':''}">✓ Terminé</span>
             </div>
             <button class="session-toggle" onclick="toggleSession(event,'${day.id}','${s.id}')">▾</button>
