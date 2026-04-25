@@ -31,9 +31,14 @@ L'interface adapte automatiquement ce qui est affiché selon l'avancement :
     - **⏸ Pause / ▶ Reprendre** — fige le décompte de la phase en cours
     - **⏭ Sauter** — termine immédiatement la phase courante (prep→work, work→rest+valide la série, rest→série suivante)
     - **⏹ Reset** — annule la série en cours et ferme la modale
-- **Exercices en répétitions** : case à cocher par série + timer de repos (durée configurable, 60 s par défaut) déclenché automatiquement à la validation, avec une modale overlay identique à celle des exercices en durée (pause, saut, reset disponibles pendant le repos)
-  - Cliquer à nouveau pendant le repos annule le décompte et ferme la modale
-  - Cliquer sur une série déjà cochée (hors repos) la décoche (correction)
+- **Exercices en répétitions** : modale plein écran en **deux temps**
+  - **1. Phase d'exécution** (`rep-exec`) — la modale affiche le nom de l'exercice, la consigne (reps/charge) et attend une action manuelle :
+    - **✓ Valider** — coche la série, joue `beepEnd()`, puis enchaîne automatiquement sur la phase de repos
+    - **✕ Fermer** — ferme la modale sans cocher la série (utile si on s'est trompé de clic)
+  - **2. Phase de repos** (`rep-rest`) — décompte configurable (`restSec` sur l'exercice, 60 s par défaut), avec les mêmes contrôles que les exercices en durée :
+    - **⏸ Pause / ▶ Reprendre**, **⏭ Sauter**, **⏹ Reset**
+    - À la fin du repos : bip montant + auto-clic sur le bouton ▶ de la série suivante (ou fermeture + repli de l'exercice si c'était la dernière série)
+  - Cliquer sur une série déjà cochée (hors modale) la décoche pour correction manuelle
 - **Exercices latéraux** (`/côté`) : lignes séparées Gauche / Droite avec timer individuel par côté — le repos ne se déclenche qu'après le second côté
 - **Exercices alternés continus** (crunch bicycle, superman, planche tap) : séries simples sans séparation gauche/droite — serieInfo indique le total de cycles
 - **Exercices alternés avec pause** (Bird Dog, Dead Bug) : séries simples, alternance fluide gauche/droite au sein de chaque série — serieInfo précise le nombre de reps par côté

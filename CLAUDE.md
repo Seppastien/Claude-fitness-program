@@ -6,7 +6,7 @@ Guide de développement pour Claude. Ce fichier décrit l'architecture, les conv
 
 ## Vue d'ensemble
 
-Fichier unique : `programme_semaine.html` (~3130 lignes).
+Fichier unique : `programme_semaine.html` (~3350 lignes).
 Aucune dépendance externe. Tout est en HTML/CSS/JS vanilla dans un seul fichier.
 
 Deux modes utilisateur cohabitent :
@@ -38,16 +38,19 @@ programme_semaine.html
     │                renderDayPanel, renderSeriesTracker, renderRepTracker,
     │                renderSubExoTracker, renderOverview, renderTabs
     ├── INTERACTIONS toggleEx, toggleVelo, setStar, setFeeling, saveJournalEntry,
-    │                syncExValidation, toggleSerieCheck, repSerieCheck,
+    │                syncExValidation, toggleSerieCheck,
+    │                startRepSerie, validateRepSerie, closeRepExecModal,
+    │                startRepRest, finishRepRest,
     │                onExerciseScaleInput, onExerciseScaleChange
     ├── TIMERS       beep*, parseReps, parseRepSets, isDurationEx, fmtTime,
     │                scaledSec, scaledSubSec, scaledRepsString,
     │                startAllSeries, startSerieTimer, tickSerieTimer,
     │                transitionToWork, finishWorkPhase, finishRestPhase,
     │                finalizeExerciseCompletion, resetSerieTimer
-    ├── TIMER MODAL  openTimerModal, openRepRestModal, closeTimerModal,
-    │                updateTimerModal, pauseModalTimer, skipModalTimer,
-    │                resetModalTimer, findExerciseInfo, modalState, PREP_SECS
+    ├── TIMER MODAL  openTimerModal(sid, mode, opts), closeTimerModal,
+    │                updateTimerModal, applyModalMode, updateNextLabel,
+    │                pauseModalTimer, skipModalTimer, resetModalTimer,
+    │                findExerciseInfo, modalState, PREP_SECS
     ├── REPLI        toggleSession, toggleExCollapse
     ├── WEEK NAV     changeWeek, updateWeekDisplay
     ├── ADMIN MODE   toggleAdminMode, renderAdminTree, renderAdminEditor,
@@ -277,29 +280,39 @@ if (serieIdx + 1 < totalSets) {
 
 ## Modale timer plein écran
 
-La modale `#timer-modal` s'affiche par-dessus l'app dans deux cas (masquée en `body.admin-mode`) :
-- **Pendant une série en durée** : phases prep / work / rest avec contrôles pause/skip/reset.
-- **Pendant le repos d'une série en reps** : affiche uniquement la phase `rest` avec les mêmes contrôles.
+La modale `#timer-modal` s'affiche par-dessus l'app dans **trois modes** (masquée en `body.admin-mode`) :
+
+- **Mode `'duration'`** — série en durée : phases `prep` / `work` / `rest` avec contrôles `⏸ Pause` / `⏭ Sauter` / `⏹ Reset`.
+- **Mode `'rep-exec'`** — exécution d'une série en reps : affichage du nombre de reps attendu dans `#tm-time`, libellé de phase « À toi de jouer », boutons `✓ Valider` / `✕ Fermer`. **Pas de timer qui défile** — action manuelle.
+- **Mode `'rep-rest'`** — repos après validation d'une série en reps : décompte avec les mêmes contrôles que `'duration'` (`⏸ Pause` / `⏭ Sauter` / `⏹ Reset`).
+
+Point d'entrée unique : `openTimerModal(sid, mode, opts)`. Pour `'rep-rest'` on transitionne généralement depuis `'rep-exec'` via `startRepRest` — la modale reste ouverte et bascule les boutons via `applyModalMode`.
 
 ### État
 
 ```javascript
-const modalState = { sid: null, active: false, isRepRest: false };
+const modalState = { sid: null, active: false, isRepRest: false, mode: null, repMeta: null };
 ```
 
-`isRepRest` distingue les deux contextes d'utilisation : `skipModalTimer` et `resetModalTimer` branchent différemment selon cette valeur. Un seul timer peut être visible à la fois : `updateTimerModal(sid, ...)` ignore tout appel concernant un `sid` différent du `sid` actif.
+- `mode` est le discriminant principal (`'duration'` / `'rep-exec'` / `'rep-rest'`). C'est sur cette valeur que `skipModalTimer` / `resetModalTimer` / `applyModalMode` branchent.
+- `isRepRest` est maintenu pour compat interne (= `mode === 'rep-rest'`).
+- `repMeta` mémorise `{ restSec, isLast }` pour les modes `'rep-exec'` et `'rep-rest'` — utilisé par `validateRepSerie` pour enchaîner sur le bon repos.
+- Un seul timer peut être visible à la fois : `updateTimerModal(sid, ...)` ignore tout appel concernant un `sid` différent du `sid` actif.
 
 ### API
 
 | Fonction | Rôle |
 |----------|------|
-| `openTimerModal(sid)` | Résout l'exercice via `findExerciseInfo`, remplit nom/desc/libellé série/reps, affiche la modale — utilisé pour les séries en durée |
-| `openRepRestModal(sid)` | Même remplissage que `openTimerModal` mais pose `modalState.isRepRest = true` — utilisé par `repSerieCheck` pendant le repos |
-| `closeTimerModal()` | Masque la modale, remet `modalState` à zéro (sid, active, isRepRest) |
+| `openTimerModal(sid, mode, opts)` | Point d'entrée unique. Résout l'exercice via `findExerciseInfo`, remplit nom/desc/libellé série/reps/badge scale, pose `modalState`, appelle `applyModalMode(mode)` + `updateNextLabel(sid)`. `opts` = `{ restSec, isLast }` pour `'rep-exec'`/`'rep-rest'` |
+| `applyModalMode(mode)` | Affiche/masque les boutons de `.tm-actions` selon le mode : Pause/Skip/Reset pour `'duration'` & `'rep-rest'`, Valider/Fermer pour `'rep-exec'` |
+| `updateNextLabel(sid)` | Rafraîchit `#tm-next` avec « Suivant : {série suivante} », « Prochain exercice : {nom} » ou « 🎉 Fin de séance » |
+| `closeTimerModal()` | Masque la modale, remet `modalState` à zéro (sid, active, isRepRest, mode, repMeta) et vide `#tm-next` |
 | `updateTimerModal(sid, phaseType, remaining)` | Met à jour le libellé de phase (`prep`/`work`/`rest`) et le compteur. En `prep`, le chiffre est agrandi (classe `.big`) |
+| `validateRepSerie()` | Handler du bouton `✓ Valider` (mode `'rep-exec'`). Coche la série, bipe, puis enchaîne sur `startRepRest(sid, restSec, isLast)` |
+| `closeRepExecModal()` | Handler du bouton `✕ Fermer` (mode `'rep-exec'`). Ferme la modale sans rien cocher — la série reste relançable via son ▶ |
 | `pauseModalTimer()` | Toggle `st.paused` — le tick ignore les secondes pendant la pause |
-| `skipModalTimer()` | Force la fin de la phase courante. Si `isRepRest` : saute le repos et appelle `syncExValidation`/`finalizeExerciseCompletion` si c'était la dernière série. Sinon : `prep`→`transitionToWork`, `work`→`finishWorkPhase`, `rest`→`finishRestPhase` |
-| `resetModalTimer()` | Si `isRepRest` : annule le timer de repos et ferme. Sinon : `resetSerieTimer(sid)` + ferme |
+| `skipModalTimer()` | Force la fin de la phase courante. Si `mode === 'rep-rest'` : saute le repos et appelle `finishRepRest`. Sinon : `prep`→`transitionToWork`, `work`→`finishWorkPhase`, `rest`→`finishRestPhase` |
+| `resetModalTimer()` | Si `mode === 'rep-rest'` : annule le timer de repos, remet le bouton du tracker prêt, ferme. Sinon : `resetSerieTimer(sid)` + ferme |
 | `resetSerieTimer(sid)` | Nettoie l'interval d'une série en durée, remet le bouton du tracker à son état initial |
 
 ### Points d'attention
@@ -307,7 +320,8 @@ const modalState = { sid: null, active: false, isRepRest: false };
 - La résolution de l'exercice passe par `findExerciseInfo` qui lit `getSessionsForDay(dayId)` — donc **dépend de `LIVE_CONFIG`** et non de constantes figées.
 - Le libellé de série est **réutilisé** depuis le DOM (`.serie-label` de la ligne `#srow_{sid}`), pas recalculé — garantit l'alignement avec le tracker (ex : `Série 2/3`, `Gauche 1/3`, `Sphinx 2/3`).
 - Skip en `work` **valide la série** (coche auto + `syncExValidation`) comme si le timer était allé au bout.
-- Reset NE valide PAS la série et remet le bouton du tracker en état « prêt à démarrer ».
+- Reset en `'duration'` NE valide PAS la série et remet le bouton du tracker en état « prêt à démarrer ».
+- En `'rep-exec'`, aucun timer n'est créé dans `serieTimers[sid]` — le démarrage du décompte a lieu seulement après `validateRepSerie` via `startRepRest`.
 
 ---
 
@@ -324,15 +338,35 @@ Deux fonctions distinctes selon le contexte :
 
 ---
 
-## États de repSerieCheck (reps)
+## Cycle d'une série en reps (modale en deux temps)
 
-La case d'une série reps a **trois comportements** selon l'état courant :
+Une série reps est **manuelle** : l'utilisateur exécute les reps à son rythme, puis valide. Le décompte de repos suit ensuite automatiquement.
 
-1. **Non cochée, pas de timer** → coche, lance le décompte de repos via `openRepRestModal` (modale overlay, même contrôles que le timer durée), sauf sur la dernière série où le repos est quand même lancé — c'est `finishRestPhase` équivalent qui appelle `syncExValidation` + `finalizeExerciseCompletion` en fin de repos.
-2. **Cochée, timer en cours** → annule le timer de repos, ferme la modale, remet l'affichage à zéro.
-3. **Cochée, pas de timer** → décoche (permet la correction manuelle).
+### Flux complet (bouton ▶ d'une série en reps)
 
-La durée du repos est lue depuis `ex.restSec` si défini, sinon 60 s par défaut.
+1. **Clic ▶** → `startRepSerie(sid, restSec, isLast)` :
+   - Si un timer de repos était en cours pour ce `sid` (double-clic) → annule proprement et retourne.
+   - Sinon → ouvre la modale en mode `'rep-exec'` (affiche le nombre de reps attendu, boutons `✓ Valider` / `✕ Fermer`) et ajoute la classe `running` au bouton du tracker.
+2. **Clic `✓ Valider` dans la modale** → `validateRepSerie()` :
+   - Coche la case `schk_{sid}`, joue `beepEnd()`.
+   - Synchronise l'exercice via `syncExValidation(chk)` — sauf pour la dernière série, où l'étape finale attendra la fin du repos.
+   - Enchaîne sur `startRepRest(sid, restSec, isLast)`.
+3. **`startRepRest`** : bascule la modale en mode `'rep-rest'` via `applyModalMode('rep-rest')`, démarre un `setInterval` 1 s qui décrémente `serieTimers[sid].remaining` et met à jour `#tm-time` + `#stdisp_{sid}`. À 0 → `beepRestEnd()` + `finishRepRest(sid, isLast, chk)`.
+4. **`finishRepRest`** : ferme la modale. Si `isLast` → `syncExValidation` + `playExerciseCompleteSound` + `finalizeExerciseCompletion`. Sinon → auto-clic sur le ▶ suivant (qui relance `startRepSerie` pour la prochaine série).
+
+### Cas "Fermer" ou reset pendant rep-exec
+
+- **`✕ Fermer`** (`closeRepExecModal`) : ferme la modale sans cocher. La série reste relançable via son ▶. Le bouton du tracker perd sa classe `running`.
+- **Annuler via le ▶ du tracker** pendant un timer de repos actif : même handler `startRepSerie` détecte `serieTimers[sid].interval` et annule proprement (efface le timer, remet le bouton prêt, ferme la modale).
+
+### Clic direct sur la case `schk_{sid}` (hors modale)
+
+`toggleSerieCheck(sid)` : bascule simplement la classe `done` et appelle `syncExValidation`. **Pas de timer** — permet la correction manuelle d'une série déjà validée (décocher) ou l'enregistrement rapide sans repos.
+
+### Paramètres
+
+- `restSec` : lu depuis `ex.restSec` si défini, sinon **60 s par défaut** (cf. `renderRepTracker`).
+- `isLast` : booléen précalculé par `renderRepTracker` et passé dans le `onclick` de chaque ▶ — détermine si le `finishRepRest` doit déclencher la fanfare de fin d'exercice.
 
 ---
 
