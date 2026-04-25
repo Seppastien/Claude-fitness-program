@@ -446,15 +446,15 @@ body.admin-mode .timer-modal{display:none !important}
 const DAYS = [
   { id:'lun', label:'Lun', fullName:'Lundi', type:'bureau' },
   { id:'mar', label:'Mar', fullName:'Mardi', type:'tele' },
-  { id:'mer', label:'Mer', fullName:'Mercredi', type:'bureau' },
+  { id:'mer', label:'Mer', fullName:'Mercredi', type:'bureauMuscu' },
   { id:'jeu', label:'Jeu', fullName:'Jeudi', type:'tele' },
   { id:'ven', label:'Ven', fullName:'Vendredi', type:'bureau' },
   { id:'sam', label:'Sam', fullName:'Samedi', type:'weekend' },
   { id:'dim', label:'Dim', fullName:'Dimanche', type:'weekend' },
 ];
 
-const TYPE_LABELS = { bureau:'Bureau + Vélo', tele:'Télétravail', weekend:'Week-end' };
-const TYPE_COLORS = { bureau:'bureau', tele:'tele', weekend:'weekend' };
+const TYPE_LABELS = { bureau:'Bureau + Vélo', bureauMuscu:'Bureau + Vélo + Muscu', tele:'Télétravail', weekend:'Week-end' };
+const TYPE_COLORS = { bureau:'bureau', bureauMuscu:'bureau', tele:'tele', weekend:'weekend' };
 const EX_TYPE_LABELS = { gainage:'Gainage', etirement:'Étirement', cardio:'Cardio', muscu:'Muscu', yoga:'Yoga', velo:'Vélo' };
 
 // SESSIONS — Séances livrées par défaut, indexées par type de jour.
@@ -502,6 +502,33 @@ const SESSIONS = {
       ]
     },
   ],
+
+  // ── Sessions bureau + muscu (Mer uniquement) ──
+  // bureauMuscu N'EST PAS un superset complet : c'est seulement la séance muscu
+  // jambes/dos qui REMPLACE le "Soir — Décompression lombaire" du mercredi.
+  // La composition complète (matin lombaire + vélos + cette muscu) est faite
+  // dynamiquement dans getSessionsForDay (cas 'bureauMuscu') — ainsi pas de
+  // duplication des sessions matin/vélo.
+  bureauMuscu: [
+    {
+      id:'muscu_mer', emoji:'🏋️', title:'Soir — Muscu jambes & dos',
+      desc:'Après le vélo retour · 35–40 min · objectif silhouette', duration:'35–40 min', difficulte:'Soutenu', kcal:280,
+      isMuscu: true,
+      note:'2e séance muscu de la semaine, ciblée jambes + tirages (le samedi couvre le haut du corps). Charge 4 kg/main pour démarrer ; augmenter via les boutons +/− quand les 12 reps sont fluides. Repos 60–90 s entre séries.',
+      exercises:[
+        {id:'b_mu1', name:'Goblet squat', desc:'Debout, pieds largeur épaules, 1 haltère tenu vertical contre la poitrine (les deux mains sous le disque haut). Descends en gardant le buste droit, genoux dans l\'axe des pieds. Quadriceps + fessiers + gainage.', reps:'3 × 12', sec:240, type:'muscu', charge:'1×4 kg', restSec:90, serieInfo:'12 reps · 1 haltère 4 kg · descente 2 s · remontée 1 s · pause genoux pliés en bas', url:'https://jemeremetsausport.com/squat-goblet/'},
+        {id:'b_mu2', name:'Fente avant alternée', desc:'Debout, haltères le long du corps. Avance d\'un grand pas, descends le genou arrière vers le sol (sans le toucher), remonte. Alterne les jambes à chaque rep. Quadriceps + fessiers.', reps:'3 × 12', sec:360, type:'muscu', charge:'2×4 kg', restSec:90, serieInfo:'12 fentes alternées · 6 par jambe · 4 kg/main · descente contrôlée 2 s', url:'https://jemeremetsausport.com/fentes-avant-avec-halteres/'},
+        {id:'b_mu3', name:'Soulevé de terre roumain (haltères)', desc:'Debout, haltères devant les cuisses. Buste qui se penche en avant en gardant le dos plat, jambes légèrement fléchies, haltères glissent le long des cuisses jusqu\'aux genoux. Remonte en contractant les fessiers. Ischios + lombaires + fessiers.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×4 kg', restSec:90, serieInfo:'12 reps · 4 kg/main · descente 2 s · remontée 1 s · dos PLAT en permanence', url:'https://jemeremetsausport.com/souleve-de-terre-roumain-avec-halteres/'},
+        {id:'b_mu4', name:'Pont fessier chargé', desc:'Allongé sur le dos, genoux pliés, pieds au sol. Pose 1 haltère sur le bassin (le tenir des deux mains). Pousse les hanches vers le plafond, contracte fort les fessiers en haut, tiens 2 s, descends lentement. Fessiers ciblés.', reps:'3 × 12', sec:180, type:'muscu', charge:'1×4 kg', restSec:60, serieInfo:'12 reps · 1 haltère 4 kg sur le bassin · tenu 2 s en haut · descente 2 s', url:'https://jemeremetsausport.com/pont/'},
+        {id:'b_mu5', name:'Rowing penché bilatéral', desc:'Debout, jambes légèrement fléchies, buste penché à 45° (dos plat). Haltères pendants, paumes vers les cuisses. Tire les deux haltères vers les hanches en serrant les omoplates, coudes le long du corps. Grand dorsal + rhomboïdes + biceps.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×4 kg', restSec:90, serieInfo:'12 reps · 4 kg/main · tiré 1 s · tenu 1 s · descente 2 s · serre les omoplates', url:'https://jemeremetsausport.com/rowing-haltere-buste-penche/'},
+        {id:'b_mu6', name:'Mollets debout (haltères)', desc:'Debout, haltères le long du corps, pieds largeur hanches. Monte sur la pointe des pieds, contracte fort les mollets, tiens 1 s en haut, descends lentement. Pour augmenter l\'amplitude, faire l\'exo sur une marche en laissant descendre les talons sous le niveau.', reps:'3 × 15', sec:180, type:'muscu', charge:'2×4 kg', restSec:60, serieInfo:'15 reps · 4 kg/main · montée 1 s · tenu 1 s · descente 2 s', url:'https://jemeremetsausport.com/exercice-mollet-debout/'},
+        {id:'b_mu7', name:'Étirement ischio-jambiers allongé', desc:'Allongé sur le dos, lève une jambe tendue vers le plafond, attrape l\'arrière de la cuisse (ou utilise une sangle/serviette autour du pied). Tire doucement vers toi, l\'autre jambe reste tendue au sol. Indispensable après le SDT et les fentes.', reps:'3 × 30 s /côté', sec:180, type:'etirement', url:'https://www.coach-hunter.com/exercice/ischios-jambiers/etirement-allonge'},
+        {id:'b_mu8', name:'Étirement piriforme figure 4', desc:'Allongé sur le dos, cheville droite croisée sur le genou gauche (forme un 4). Attrape la cuisse gauche derrière et tire vers toi. Libère le bas du dos et les fessiers profonds, complément de la séance jambes.', reps:'2 × 30 s /côté', sec:120, type:'etirement', url:'https://asanas.fr/postures-yoga/pigeon-ardha-kapotasana'},
+        {id:'b_mu9', name:'Sphinx extension douce', desc:'À plat ventre, avant-bras au sol parallèles (coudes sous les épaules). Pousse doucement la poitrine vers l\'avant et le haut, sans forcer le bas du dos. Contre-balance la flexion du SDT et de la position vélo.', reps:'3 × 30 s', sec:90, type:'etirement', url:'https://www.tummee.com/fr/yoga-poses/sphinx-pose'},
+      ]
+    },
+  ],
+
   // ── Sessions télétravail (Mar / Jeu) ──
   tele: [
     {
@@ -572,16 +599,16 @@ const SESSIONS = {
         id:'muscu_sam', emoji:'🏋️', title:'Musculation — Haut du corps',
         desc:'Banc + haltères · progression douce · 45–55 min', duration:'45–55 min', difficulte:'Soutenu', kcal:310,
         isMuscu: true,
-        note:'Débutant / reprise : commencer léger (2 kg par haltère). Augmenter les disques uniquement quand les 12 reps sont fluides sur 3 séries. Repos 60–90 s entre séries.',
+        note:'Charge de base : 4 kg par haltère sur les compounds (développé, rowing, curl, shrugs). Augmenter via les boutons +/− quand les 12 reps sont fluides sur 3 séries. Repos 60–90 s entre séries.',
         exercises:[
-          {id:'s_mu1', name:'Développé couché à plat (banc)', desc:'Allongé sur le banc à plat, haltères au niveau de la poitrine, coudes à 45°. Pousse vers le haut en expirant. Pectoraux + triceps + épaules avant.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg', serieInfo:'12 reps · 2 kg/bras · montée 1 s · descente 2 s', url:'https://jemeremetsausport.com/developpe-couche/'},
-          {id:'s_mu2', name:'Développé incliné (banc incliné ~30°)', desc:'Banc incliné, même mouvement. Cible le haut des pectoraux et les deltoïdes antérieurs. Charge identique ou légèrement réduite.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg', serieInfo:'12 reps · 2 kg/bras · montée 1 s · descente 2 s', url:'https://jemeremetsausport.com/developpe-incline-avec-halteres/'},
-          {id:'s_mu3', name:'Rowing un bras (appui sur banc)', desc:'Genou et main sur le banc, dos horizontal. Tire l\'haltère vers la hanche, coude rasant. Grand dorsal + rhomboïdes + biceps.', reps:'3 × 12 /côté', sec:480, type:'muscu', charge:'1×2 kg', serieInfo:'12 reps/côté · 2 kg · tiré 1 s · tenu 1 s · descente 2 s', url:'https://jemeremetsausport.com/rowing-haltere-a-un-bras/'},
+          {id:'s_mu1', name:'Développé couché à plat (banc)', desc:'Allongé sur le banc à plat, haltères au niveau de la poitrine, coudes à 45°. Pousse vers le haut en expirant. Pectoraux + triceps + épaules avant.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×4 kg', serieInfo:'12 reps · 4 kg/bras · montée 1 s · descente 2 s', url:'https://jemeremetsausport.com/developpe-couche/'},
+          {id:'s_mu2', name:'Développé incliné (banc incliné ~30°)', desc:'Banc incliné, même mouvement. Cible le haut des pectoraux et les deltoïdes antérieurs. Charge identique ou légèrement réduite.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×4 kg', serieInfo:'12 reps · 4 kg/bras · montée 1 s · descente 2 s', url:'https://jemeremetsausport.com/developpe-incline-avec-halteres/'},
+          {id:'s_mu3', name:'Rowing un bras (appui sur banc)', desc:'Genou et main sur le banc, dos horizontal. Tire l\'haltère vers la hanche, coude rasant. Grand dorsal + rhomboïdes + biceps.', reps:'3 × 12 /côté', sec:480, type:'muscu', charge:'1×4 kg', serieInfo:'12 reps/côté · 4 kg · tiré 1 s · tenu 1 s · descente 2 s', url:'https://jemeremetsausport.com/rowing-haltere-a-un-bras/'},
           {id:'s_mu4', name:'Élévations latérales debout', desc:'Debout, légèrement penché en avant, jambes écartées. Lève les bras en T jusqu\'à hauteur d\'épaules, descends lentement. Deltoïdes médians.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg', serieInfo:'12 reps · 1 kg/bras · montée 2 s · descente 3 s', url:'https://jemeremetsausport.com/elevations-laterales/'},
-          {id:'s_mu5', name:'Curl biceps debout', desc:'Debout, jambes écartées, haltères en supination. Fléchis les coudes sans bouger les épaules. Descends lentement (2 s). Biceps.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×2 kg', serieInfo:'12 reps · 2 kg/bras · montée 1 s · tenu 1 s · descente 2 s', url:'https://jemeremetsausport.com/curl-biceps-alterne-avec-halteres/'},
+          {id:'s_mu5', name:'Curl biceps debout', desc:'Debout, jambes écartées, haltères en supination. Fléchis les coudes sans bouger les épaules. Descends lentement (2 s). Biceps.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×4 kg', serieInfo:'12 reps · 4 kg/bras · montée 1 s · tenu 1 s · descente 2 s', url:'https://jemeremetsausport.com/curl-biceps-alterne-avec-halteres/'},
           {id:'s_mu6', name:'Extension triceps couché (banc plat)', desc:'Allongé, haltères tendus vers le plafond. Fléchis uniquement les coudes pour descendre les haltères de chaque côté de la tête. Triceps longs.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg', serieInfo:'12 reps · 1 kg/bras · descente 2 s · montée 1 s', url:'https://jemeremetsausport.com/extensions-des-triceps-avec-halteres-en-position-couchee/'},
           {id:'s_mu7', name:'Oiseau buste penché debout / Reverse fly', desc:'Debout, jambes écartées, buste penché à ~45° (dos plat, regard vers le sol). Haltères pendants sous la poitrine, paumes face à face, coudes légèrement fléchis. Lève les bras en T jusqu\'à hauteur d\'épaules en serrant les omoplates, descends lentement. Trapèzes moyens + deltoïdes postérieurs. Clé pour la posture.', reps:'3 × 12', sec:240, type:'muscu', charge:'2×1 kg', serieInfo:'12 reps · 1 kg/bras · montée 2 s · tenu 1 s · descente 2 s', url:'https://jemeremetsausport.com/oiseau-avec-halteres-assis/'},
-          {id:'s_mu8', name:'Shrugs (haussements d\'épaules)', desc:'Debout jambes écartées, haltères le long du corps. Monte les épaules vers les oreilles, tiens 1 s, descends lentement. Trapèzes supérieurs.', reps:'3 × 12', sec:180, type:'muscu', charge:'2×2 kg', serieInfo:'12 reps · 2 kg/bras · montée 1 s · tenu 1 s · descente 2 s', url:'https://jemeremetsausport.com/exercices-epaule-shrugs-halteres/'},
+          {id:'s_mu8', name:'Shrugs (haussements d\'épaules)', desc:'Debout jambes écartées, haltères le long du corps. Monte les épaules vers les oreilles, tiens 1 s, descends lentement. Trapèzes supérieurs.', reps:'3 × 12', sec:180, type:'muscu', charge:'2×4 kg', serieInfo:'12 reps · 4 kg/bras · montée 1 s · tenu 1 s · descente 2 s', url:'https://jemeremetsausport.com/exercices-epaule-shrugs-halteres/'},
         ]
       },
       {
@@ -675,13 +702,34 @@ function isValidConfig(c) {
     && Array.isArray(c.sessions.weekend.dim);
 }
 
+// Migration silencieuse pour les configs sauvegardées avant l'ajout de
+// `bureauMuscu` (séance muscu mercredi). On garde version=1 pour rester compat
+// avec les fichiers Drive existants ; on s'assure juste que le mercredi pointe
+// sur le bon type et que la séance muscu existe dans sessions.
+function migrateConfig(c) {
+  if (!c) return c;
+  if (c.days && c.days[2] && c.days[2].id === 'mer' && c.days[2].type === 'bureau') {
+    c.days[2].type = 'bureauMuscu';
+  }
+  if (c.sessions && !c.sessions.bureauMuscu && DEFAULT_CONFIG.sessions.bureauMuscu) {
+    c.sessions.bureauMuscu = JSON.parse(JSON.stringify(DEFAULT_CONFIG.sessions.bureauMuscu));
+  }
+  if (c.typeLabels && !c.typeLabels.bureauMuscu) {
+    c.typeLabels.bureauMuscu = DEFAULT_CONFIG.typeLabels.bureauMuscu || 'Bureau + Vélo + Muscu';
+  }
+  if (c.typeColors && !c.typeColors.bureauMuscu) {
+    c.typeColors.bureauMuscu = DEFAULT_CONFIG.typeColors.bureauMuscu || 'bureau';
+  }
+  return c;
+}
+
 function loadConfig() {
   try {
     const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (isValidConfig(parsed)) {
-        LIVE_CONFIG = parsed;
+        LIVE_CONFIG = migrateConfig(parsed);
         return;
       }
     }
@@ -1053,9 +1101,9 @@ async function loadConfigFromDrive() {
     if (!res) return;
     const remote = await res.json();
     if (isValidConfig(remote)) {
-      LIVE_CONFIG = remote;
+      LIVE_CONFIG = migrateConfig(remote);
       // Miroir localStorage pour un redémarrage offline cohérent.
-      try { localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(remote)); } catch {}
+      try { localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(LIVE_CONFIG)); } catch {}
     }
   } catch(e) { console.error('loadConfigFromDrive', e); }
 }
@@ -1216,6 +1264,13 @@ function getSessionsForDay(dayId) {
     const w = LIVE_CONFIG.sessions.weekend;
     if (!w) return null;
     return w[dayId] || null;
+  }
+  if (day.type === 'bureauMuscu') {
+    // Mercredi : composition dynamique = bureau (sans le soir lombaire) + muscu jambes/dos
+    // Pas de duplication des sessions matin/vélo : elles restent partagées avec lun/ven.
+    const bureau = LIVE_CONFIG.sessions.bureau || [];
+    const extras = LIVE_CONFIG.sessions.bureauMuscu || [];
+    return [...bureau.filter(s => s.id !== 'soir_bureau'), ...extras];
   }
   return LIVE_CONFIG.sessions[day.type];
 }
@@ -2779,6 +2834,12 @@ function getSessionsForDayConfig(dayId) {
     if (!LIVE_CONFIG.sessions.weekend[dayId]) LIVE_CONFIG.sessions.weekend[dayId] = [];
     return LIVE_CONFIG.sessions.weekend[dayId];
   }
+  if (day.type === 'bureauMuscu') {
+    // Côté admin : on n'expose que les sessions "extras" du mercredi (la muscu).
+    // Les sessions partagées (matin lombaire + vélos) sont éditées via lun/ven.
+    if (!LIVE_CONFIG.sessions.bureauMuscu) LIVE_CONFIG.sessions.bureauMuscu = [];
+    return LIVE_CONFIG.sessions.bureauMuscu;
+  }
   if (!LIVE_CONFIG.sessions[day.type]) LIVE_CONFIG.sessions[day.type] = [];
   return LIVE_CONFIG.sessions[day.type];
 }
@@ -2795,7 +2856,7 @@ function adminFindExercise(dayId, sessionId, exerciseId) {
 
 function adminCollectAllExerciseIds() {
   const all = [];
-  ['bureau','tele'].forEach(t => (LIVE_CONFIG.sessions[t]||[]).forEach(s => (s.exercises||[]).forEach(e => all.push(e.id))));
+  ['bureau','bureauMuscu','tele'].forEach(t => (LIVE_CONFIG.sessions[t]||[]).forEach(s => (s.exercises||[]).forEach(e => all.push(e.id))));
   ['sam','dim'].forEach(d => (LIVE_CONFIG.sessions.weekend && LIVE_CONFIG.sessions.weekend[d]||[]).forEach(s => (s.exercises||[]).forEach(e => all.push(e.id))));
   return all;
 }
