@@ -491,6 +491,52 @@ Le scale est **capturé** dans `serieTimers[sid].secPerSet` au démarrage de la 
 
 ---
 
+## Charge ajustable (haltères)
+
+Les exercices avec un champ `charge` au format `"N×K kg"` exposent un contrôle **+1 kg / −1 kg** sous la zone d'intensité (carte d'exercice dépliée). La valeur ajustée est **K**, le poids par haltère ; **N** (nombre d'haltères) reste celui de la config.
+
+### Données
+
+- `WEIGHTS_STORAGE_KEY = 'fitness_exercise_weights'` — clé localStorage + champ dans le fichier Drive progression.
+- `EXERCISE_WEIGHTS` — objet `{ exId → kg par haltère }`. **Global par exercice**, persiste d'une semaine à l'autre. N'est **pas** dans `LIVE_CONFIG` (l'export/import config reste portable).
+- Bornes : `WEIGHT_MIN = 0` (sans charge) à `WEIGHT_MAX = 50` (kg). Pas de 1 kg.
+- Valeur égale au défaut parsé depuis `ex.charge` → entrée supprimée du store (compact).
+
+### API
+
+| Fonction | Rôle |
+|----------|------|
+| `loadWeights()` | Lit `localStorage[WEIGHTS_STORAGE_KEY]`, fallback `{}` |
+| `parseCharge(charge)` | `"N×K kg"` → `{count, kg}` ou `null` si format non reconnu |
+| `hasAdjustableWeight(ex)` | True si `parseCharge(ex.charge)` retourne un objet |
+| `getDefaultWeight(ex)` | K parsé depuis `ex.charge` (kg) |
+| `getExerciseWeight(ex)` | Override utilisateur si présent, sinon défaut |
+| `saveWeight(exId, kg, defaultKg)` | Clamp [0,50], suppression si `==` default, miroir localStorage, push Drive |
+| `chargeDisplay(ex)` | Texte d'affichage `"N×K kg"` ou `"Sans charge"` (kg=0) |
+| `isWeightModified(ex)` | True si l'override diffère du défaut (pour styler le tag en orange) |
+| `updateModalCharge(ex)` | Met à jour la pastille `#tm-charge` (texte + classe `.modified`) |
+
+### Affichage
+
+- **Carte** : tag charge à droite (`#schg_{day}_{ex}`) dans la teinte normale (mauve) ou orange (`.modified`) si l'utilisateur a ajusté. Sous l'intensité : ligne dédiée `Charge [−] {N kg / haltère} [+]` (`#swval_…`, `#swbtn_minus_…`, `#swbtn_plus_…`).
+- **Modale timer** : pastille `#tm-charge` ajoutée dans `.tm-meta` à côté de `tm-reps` et `tm-scale`. Mêmes deux teintes (mauve / orange).
+
+### Handler
+
+- `onExerciseWeightChange(dayId, exId, delta)` — appelé sur clic des boutons `+`/`−`. Étapes :
+  1. `saveWeight` (clamp, persistance)
+  2. Refresh valeur sous les boutons + état disabled (min/max atteints)
+  3. Refresh charge-tag de la carte (texte + classe `.modified`)
+  4. Si la modale timer est active pour un sid de cet exercice → `updateModalCharge(ex)`
+
+### Règles
+
+- `serieInfo` reste statique (texte "12 reps · 2 kg/bras · …") — c'est une description, le tag charge fait foi.
+- Le `sec` / `reps` de l'exercice ne sont **pas** recalculés en fonction de la charge — seul l'intensity slider scale ces valeurs.
+- Le poids ajusté s'applique au prochain affichage seulement ; pas de timer à recapturer.
+
+---
+
 ## Mode admin
 
 Activé par `toggleAdminMode()` (bouton ⚙ en topbar). Ajoute `body.admin-mode` qui masque la vue utilisateur et affiche `.admin-container` (éditeur en deux colonnes : arborescence + éditeur de champ).

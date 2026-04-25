@@ -229,6 +229,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .tm-scale{font-family:'DM Mono',monospace;font-size:11px;color:#2F6B85;background:#EAF4F8;padding:4px 10px;border-radius:20px}
 body.admin-mode .ex-scale-row{display:none}
 
+/* ── Contrôle de charge (haltères) ── */
+.ex-weight-row{display:flex;align-items:center;gap:10px;padding:.5rem 1.25rem;border-top:1px solid var(--border);background:var(--surface);font-size:11px;color:var(--muted)}
+.ex-item.collapsed .ex-weight-row{display:none}
+.ex-weight-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);flex-shrink:0}
+.ex-weight-controls{flex:1;display:flex;align-items:center;justify-content:flex-end;gap:8px}
+.ex-weight-btn{width:28px;height:28px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:16px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;transition:all .12s}
+.ex-weight-btn:hover{background:var(--bureau-bg);border-color:var(--bureau);color:var(--bureau)}
+.ex-weight-btn:disabled{opacity:.35;cursor:not-allowed}
+.ex-weight-btn:disabled:hover{background:var(--surface2);border-color:var(--border2);color:var(--text)}
+.ex-weight-value{font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:var(--text);min-width:78px;text-align:center}
+.ex-weight-value.muted{color:var(--muted);font-weight:400}
+.charge-tag.modified{background:#FDF1EA;color:#C05A20;border-color:rgba(192,90,32,.25)}
+.tm-charge{font-family:'DM Mono',monospace;font-size:11px;color:#6A35A8;background:#F0EAFA;padding:4px 10px;border-radius:20px;border:1px solid rgba(106,53,168,.18)}
+.tm-charge.modified{color:#C05A20;background:#FDF1EA;border-color:rgba(192,90,32,.25)}
+body.admin-mode .ex-weight-row{display:none}
+
 /* ── REPLI SESSIONS & EXERCICES ── */
 .session-head{cursor:pointer;user-select:none}
 .session-toggle{background:none;border:none;cursor:pointer;padding:0 0 0 6px;color:var(--muted);font-size:16px;line-height:1;flex-shrink:0;transition:transform .2s;display:flex;align-items:center}
@@ -381,6 +397,7 @@ body.admin-mode .timer-modal{display:none !important}
       <span class="tm-serie" id="tm-serie"></span>
       <span class="tm-reps" id="tm-reps"></span>
       <span class="tm-scale" id="tm-scale" style="display:none"></span>
+      <span class="tm-charge" id="tm-charge" style="display:none"></span>
     </div>
     <div class="tm-phase" id="tm-phase"></div>
     <div class="tm-time" id="tm-time">0</div>
@@ -710,6 +727,84 @@ function saveScale(exId, pct) {
   return clamped;
 }
 
+// ── Charge par exercice (haltères) ──
+// EXERCISE_WEIGHTS[exId] = kg PAR haltère (override). Absent → on lit la valeur
+// par défaut depuis ex.charge ("N×K kg" → K). Persistant entre semaines, miroir
+// localStorage + Drive (même fichier que la progression). Min 0 (sans charge),
+// max 50 (raisonnable pour des haltères domestiques), pas de 1 kg.
+const WEIGHTS_STORAGE_KEY = 'fitness_exercise_weights';
+const WEIGHT_MIN = 0;
+const WEIGHT_MAX = 50;
+let EXERCISE_WEIGHTS = {};
+
+function loadWeights() {
+  try {
+    const raw = localStorage.getItem(WEIGHTS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') return parsed;
+    }
+  } catch {}
+  return {};
+}
+
+// parseCharge : extrait { count, kg } depuis "N×K kg" (ex: "2×2 kg" → {count:2,kg:2}).
+// Retourne null si format non reconnu (ex: "élastique", "barre", absent).
+function parseCharge(charge) {
+  if (!charge) return null;
+  const m = String(charge).match(/^\s*(\d+)\s*[×x]\s*(\d+(?:[.,]\d+)?)\s*kg\b/i);
+  if (!m) return null;
+  return { count: parseInt(m[1], 10), kg: parseFloat(m[2].replace(',', '.')) };
+}
+
+function hasAdjustableWeight(ex) {
+  return parseCharge(ex && ex.charge) !== null;
+}
+
+function getDefaultWeight(ex) {
+  const p = parseCharge(ex && ex.charge);
+  return p ? p.kg : null;
+}
+
+function getExerciseWeight(ex) {
+  const override = EXERCISE_WEIGHTS[ex.id];
+  if (typeof override === 'number' && override >= WEIGHT_MIN && override <= WEIGHT_MAX) return override;
+  return getDefaultWeight(ex);
+}
+
+function saveWeight(exId, kg, defaultKg) {
+  const clamped = Math.max(WEIGHT_MIN, Math.min(WEIGHT_MAX, Math.round(kg)));
+  if (typeof defaultKg === 'number' && clamped === defaultKg) {
+    delete EXERCISE_WEIGHTS[exId];
+  } else {
+    EXERCISE_WEIGHTS[exId] = clamped;
+  }
+  try { localStorage.setItem(WEIGHTS_STORAGE_KEY, JSON.stringify(EXERCISE_WEIGHTS)); } catch {}
+  if (driveState.connected) {
+    driveState.data[WEIGHTS_STORAGE_KEY] = EXERCISE_WEIGHTS;
+    scheduleSave();
+  }
+  return clamped;
+}
+
+// chargeDisplay : "N×K kg" remappé avec l'éventuel override utilisateur.
+// kg=0 → "Sans charge" (mouvement à vide). Conserve le format du parent si non reconnu.
+function chargeDisplay(ex) {
+  if (!ex || !ex.charge) return '';
+  const parsed = parseCharge(ex.charge);
+  if (!parsed) return ex.charge;
+  const kg = getExerciseWeight(ex);
+  if (kg === 0) return 'Sans charge';
+  const kgStr = Number.isInteger(kg) ? String(kg) : String(kg).replace('.', ',');
+  return `${parsed.count}×${kgStr} kg`;
+}
+
+function isWeightModified(ex) {
+  if (!ex || typeof EXERCISE_WEIGHTS[ex.id] !== 'number') return false;
+  const def = getDefaultWeight(ex);
+  return def !== null && EXERCISE_WEIGHTS[ex.id] !== def;
+}
+
 // ╔══════════════════════════════════════════════╗
 // ║  STATE — Variables globales & helpers date   ║
 // ╚══════════════════════════════════════════════╝
@@ -930,6 +1025,11 @@ async function loadFromDrive() {
         EXERCISE_SCALES = driveState.data[SCALES_STORAGE_KEY];
         try { localStorage.setItem(SCALES_STORAGE_KEY, JSON.stringify(EXERCISE_SCALES)); } catch {}
       }
+      // Hydrate EXERCISE_WEIGHTS depuis Drive si présent.
+      if (driveState.data[WEIGHTS_STORAGE_KEY] && typeof driveState.data[WEIGHTS_STORAGE_KEY] === 'object') {
+        EXERCISE_WEIGHTS = driveState.data[WEIGHTS_STORAGE_KEY];
+        try { localStorage.setItem(WEIGHTS_STORAGE_KEY, JSON.stringify(EXERCISE_WEIGHTS)); } catch {}
+      }
       setSyncUI('connected', 'Drive connecté · ' + DRIVE_FILENAME);
     } else {
       driveState.data = getAllLocalData();
@@ -1051,6 +1151,11 @@ function getAllLocalData() {
   const rawScales = localStorage.getItem(SCALES_STORAGE_KEY);
   if (rawScales) {
     try { all[SCALES_STORAGE_KEY] = JSON.parse(rawScales); } catch(e) {}
+  }
+  // Inclure le mapping des charges par exercice (donnée utilisateur globale)
+  const rawWeights = localStorage.getItem(WEIGHTS_STORAGE_KEY);
+  if (rawWeights) {
+    try { all[WEIGHTS_STORAGE_KEY] = JSON.parse(rawWeights); } catch(e) {}
   }
   return all;
 }
@@ -1282,6 +1387,28 @@ function renderDayPanel(day) {
           if (!checked && !firstOpenExFound) firstOpenExFound = true;
           const exScale = getExerciseScale(ex.id);
           const scaleBadge = exScale !== 100 ? `<span class="scale-badge" id="sbadge_${day.id}_${ex.id}">×${exScale}%</span>` : `<span class="scale-badge" id="sbadge_${day.id}_${ex.id}" style="display:none">×${exScale}%</span>`;
+          const adjustable = hasAdjustableWeight(ex);
+          const chargeText = ex.charge ? (adjustable ? chargeDisplay(ex) : ex.charge) : '';
+          const chargeModified = adjustable && isWeightModified(ex);
+          const chargeTagHtml = ex.charge
+            ? `<span class="charge-tag${chargeModified ? ' modified' : ''}" id="schg_${day.id}_${ex.id}">${chargeText}</span>`
+            : '';
+          let weightRowHtml = '';
+          if (adjustable) {
+            const curKg = getExerciseWeight(ex);
+            const minDisabled = curKg <= WEIGHT_MIN ? 'disabled' : '';
+            const maxDisabled = curKg >= WEIGHT_MAX ? 'disabled' : '';
+            const valueClass = curKg === 0 ? 'ex-weight-value muted' : 'ex-weight-value';
+            const valueText = curKg === 0 ? 'Sans charge' : `${curKg} kg / haltère`;
+            weightRowHtml = `<div class="ex-weight-row" onclick="event.stopPropagation()">
+                <span class="ex-weight-label">Charge</span>
+                <div class="ex-weight-controls">
+                  <button type="button" class="ex-weight-btn" id="swbtn_minus_${day.id}_${ex.id}" onclick="onExerciseWeightChange('${day.id}','${ex.id}',-1)" ${minDisabled} title="Retirer 1 kg">−</button>
+                  <span class="${valueClass}" id="swval_${day.id}_${ex.id}">${valueText}</span>
+                  <button type="button" class="ex-weight-btn" id="swbtn_plus_${day.id}_${ex.id}" onclick="onExerciseWeightChange('${day.id}','${ex.id}',1)" ${maxDisabled} title="Ajouter 1 kg">+</button>
+                </div>
+              </div>`;
+          }
           return `<div class="ex-item${exCollapsed?' collapsed':''}" id="exitem_${day.id}_${ex.id}"><div class="ex-row ${checked}" id="exrow_${day.id}_${ex.id}" onclick="toggleExCollapse(event,'${day.id}','${ex.id}')">
                 <button type="button" class="ex-check" onclick="event.stopPropagation();toggleEx('${day.id}','${ex.id}','${s.id}')">${checked?'✓':''}</button>
                 <div class="ex-body">
@@ -1290,7 +1417,7 @@ function renderDayPanel(day) {
                 </div>
                 <div class="ex-right">
                   <span class="ex-reps" id="sreps_${day.id}_${ex.id}">${scaledRepsString(ex)}</span>
-                  ${ex.charge ? `<span class="charge-tag">${ex.charge}</span>` : ''}
+                  ${chargeTagHtml}
                   ${scaleBadge}
                   <span class="ex-type-badge etbadge-${ex.type}">${EX_TYPE_LABELS[ex.type]||ex.type}</span>
                 </div>
@@ -1301,6 +1428,7 @@ function renderDayPanel(day) {
                 <input type="range" class="ex-scale-slider" min="50" max="150" step="5" value="${exScale}" oninput="onExerciseScaleInput('${day.id}','${ex.id}',this.value)" onchange="onExerciseScaleChange('${day.id}','${ex.id}',this.value)">
                 <span class="ex-scale-value" id="sval_${day.id}_${ex.id}">${exScale}%</span>
               </div>
+              ${weightRowHtml}
               ${ex.subExos ? renderSubExoTracker(day.id, ex) : isDurationEx(ex) ? renderSeriesTracker(day.id, ex) : renderRepTracker(day.id, ex)}</div>`;
         }).join('');
 
@@ -1438,6 +1566,67 @@ function onExerciseScaleChange(dayId, exId, rawValue) {
       else { tmScale.style.display = 'none'; }
     }
   }
+}
+
+// onExerciseWeightChange : handler des boutons +/- 1 kg sur la carte d'exercice.
+// delta = +1 ou -1. Persiste via saveWeight (clamp 0..50, miroir localStorage + Drive).
+// Rafraîchit : valeur affichée sous les boutons, état disabled des boutons,
+// charge-tag à droite de la carte, modale timer si elle est active pour ce sid.
+function onExerciseWeightChange(dayId, exId, delta) {
+  const sessions = getSessionsForDay(dayId);
+  if (!sessions) return;
+  let exObj = null;
+  for (const s of sessions) {
+    if (!s.exercises) continue;
+    const found = s.exercises.find(e => e.id === exId);
+    if (found) { exObj = found; break; }
+  }
+  if (!exObj || !hasAdjustableWeight(exObj)) return;
+
+  const currentKg = getExerciseWeight(exObj);
+  const defaultKg = getDefaultWeight(exObj);
+  const newKg = saveWeight(exId, currentKg + delta, defaultKg);
+
+  // 1) Valeur affichée sous les boutons
+  const valEl = document.getElementById(`swval_${dayId}_${exId}`);
+  if (valEl) {
+    if (newKg === 0) {
+      valEl.textContent = 'Sans charge';
+      valEl.classList.add('muted');
+    } else {
+      valEl.textContent = `${newKg} kg / haltère`;
+      valEl.classList.remove('muted');
+    }
+  }
+  // 2) Disabled state des boutons
+  const minBtn = document.getElementById(`swbtn_minus_${dayId}_${exId}`);
+  if (minBtn) minBtn.disabled = (newKg <= WEIGHT_MIN);
+  const maxBtn = document.getElementById(`swbtn_plus_${dayId}_${exId}`);
+  if (maxBtn) maxBtn.disabled = (newKg >= WEIGHT_MAX);
+  // 3) Charge-tag à droite de la carte
+  const tagEl = document.getElementById(`schg_${dayId}_${exId}`);
+  if (tagEl) {
+    tagEl.textContent = chargeDisplay(exObj);
+    tagEl.classList.toggle('modified', isWeightModified(exObj));
+  }
+  // 4) Modale timer si active pour cet exercice
+  if (modalState.active && modalState.sid && modalState.sid.startsWith(`${dayId}_${exId}_`)) {
+    updateModalCharge(exObj);
+  }
+}
+
+// updateModalCharge : met à jour le badge tm-charge avec le texte de charge courant.
+// Helper isolé pour pouvoir le réutiliser depuis onExerciseWeightChange et openTimerModal.
+function updateModalCharge(ex) {
+  const el = document.getElementById('tm-charge');
+  if (!el) return;
+  if (!hasAdjustableWeight(ex) && !ex.charge) {
+    el.style.display = 'none';
+    return;
+  }
+  el.textContent = ex.charge ? chargeDisplay(ex) : '';
+  el.classList.toggle('modified', isWeightModified(ex));
+  el.style.display = ex.charge ? '' : 'none';
 }
 
 // toggleEx : case principale de l'exercice (non via les séries).
@@ -2078,6 +2267,7 @@ function openTimerModal(sid, mode = 'duration', opts = {}) {
     if (exScale !== 100) { tmScale.textContent = `×${exScale}%`; tmScale.style.display = ''; }
     else { tmScale.style.display = 'none'; }
   }
+  updateModalCharge(ex);
   const pauseBtn = document.getElementById('tm-pause');
   if (pauseBtn) pauseBtn.textContent = '⏸ Pause';
 
@@ -2129,6 +2319,8 @@ function closeTimerModal() {
   if (timeEl) timeEl.classList.remove('paused');
   const nextEl = document.getElementById('tm-next');
   if (nextEl) nextEl.textContent = '';
+  const chgEl = document.getElementById('tm-charge');
+  if (chgEl) { chgEl.style.display = 'none'; chgEl.classList.remove('modified'); }
 }
 
 function updateTimerModal(sid, phaseType, remaining) {
@@ -3322,6 +3514,7 @@ function adminResetConfig() {
 (function init() {
   loadConfig(); // Doit précéder tout rendu : LIVE_CONFIG est la source de vérité.
   EXERCISE_SCALES = loadScales(); // Scales utilisateur — lus avant tout rendu (helpers scaled*).
+  EXERCISE_WEIGHTS = loadWeights(); // Charges (haltères) utilisateur — lues avant tout rendu.
   const jsDay = new Date().getDay(); // 0=dim, 1=lun...
   const dayMap = [6,0,1,2,3,4,5]; // JS Sunday=0 → LIVE_CONFIG.days index 6 (dim), Monday=1 → 0 (lun)...
   activeDay = LIVE_CONFIG.days[dayMap[jsDay] ?? 0].id;
