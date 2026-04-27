@@ -172,6 +172,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .sync-btn:hover{background:var(--surface2);color:var(--text)}
 .sync-btn.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
 .sync-btn.primary:hover{opacity:.85}
+.sync-btn.sync-direction{font-family:'DM Mono',monospace;font-size:10px;padding:4px 8px}
+.sync-btn[hidden]{display:none}
 
 
 /* ── Series tracker (timers & reps) ── */
@@ -376,6 +378,8 @@ body.admin-mode .timer-modal{display:none !important}
     <div class="sync-dot" id="sync-dot"></div>
     <span class="sync-lbl" id="sync-label">Non connecté — données locales uniquement</span>
   </div>
+  <button class="sync-btn sync-direction" id="sync-download-btn" onclick="forceDownloadFromDrive()" title="Écraser les données locales avec celles du Drive" hidden>⬇ Drive</button>
+  <button class="sync-btn sync-direction" id="sync-upload-btn" onclick="forceUploadToDrive()" title="Écraser le Drive avec les données locales" hidden>⬆ Local</button>
   <button class="sync-btn primary" id="sync-btn" onclick="handleSyncBtn()">Connecter Drive</button>
 </div>
 
@@ -936,12 +940,18 @@ function setSyncUI(state, label) {
   const dot = document.getElementById('sync-dot');
   const lbl = document.getElementById('sync-label');
   const btn = document.getElementById('sync-btn');
+  const dlBtn = document.getElementById('sync-download-btn');
+  const upBtn = document.getElementById('sync-upload-btn');
   dot.className = 'sync-dot' + (state ? ' '+state : '');
   if (lbl) lbl.textContent = label;
   if (state === 'connected') { btn.textContent = 'Synchronisé ✓'; btn.className = 'sync-btn'; }
   else if (state === 'syncing') { btn.textContent = '⟳ Sync…'; btn.className = 'sync-btn'; }
   else if (state === 'error') { btn.textContent = 'Réessayer'; btn.className = 'sync-btn primary'; }
   else { btn.textContent = 'Connecter Drive'; btn.className = 'sync-btn primary'; }
+  // Boutons de direction (download/upload forcé) — visibles uniquement quand un token est actif.
+  const showDirBtns = !!driveState.connected;
+  if (dlBtn) dlBtn.hidden = !showDirBtns;
+  if (upBtn) upBtn.hidden = !showDirBtns;
 }
 
 function handleSyncBtn() {
@@ -1211,6 +1221,90 @@ function getAllLocalData() {
 async function forceSyncToDrive() {
   driveState.data = getAllLocalData();
   await saveToDrive();
+}
+
+// Écrase TOUTES les données locales (progression toutes semaines + scales + weights
+// + LIVE_CONFIG) avec celles du Drive. Action destructive — confirmation requise.
+async function forceDownloadFromDrive() {
+  if (!driveState.connected || !driveState.accessToken) {
+    alert('Drive non connecté.');
+    return;
+  }
+  const ok = confirm(
+    '⚠️ Écraser les données locales avec celles du Drive ?\n\n' +
+    'Toute la progression locale (cases cochées, journal, intensités, charges) ' +
+    'et la configuration locale seront remplacées par les versions du Drive.\n\n' +
+    'Cette action est irréversible.'
+  );
+  if (!ok) return;
+  setSyncUI('syncing', 'Téléchargement depuis Drive…');
+  try {
+    // 1) Effacer les clés locales liées à l'app (progression + scales + weights + config).
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith('fitness_w') || k === SCALES_STORAGE_KEY || k === WEIGHTS_STORAGE_KEY || k === CONFIG_STORAGE_KEY)) {
+        keysToRemove.push(k);
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+
+    // 2) Reset des caches mémoire pour repartir propre. LIVE_CONFIG sera réécrit
+    //    par loadConfigFromDrive ; sinon on retombe sur le défaut via cloneDefaultConfig.
+    EXERCISE_SCALES = {};
+    EXERCISE_WEIGHTS = {};
+    driveState.data = {};
+    driveState.fileId = null;
+    driveState.configFileId = null;
+    LIVE_CONFIG = cloneDefaultConfig();
+
+    // 3) Recharger config + progression depuis Drive (re-rend l'UI à la fin).
+    await loadFromDrive();
+
+    // 4) Mirorrer en localStorage les clés de progression récupérées du Drive,
+    //    pour que l'app reste cohérente offline après cette restauration.
+    Object.keys(driveState.data).forEach(k => {
+      if (k.startsWith('fitness_w')) {
+        try { localStorage.setItem(k, JSON.stringify(driveState.data[k])); } catch {}
+      }
+    });
+
+    setSyncUI('connected', 'Drive · données restaurées');
+    alert('✅ Données locales restaurées depuis Drive.');
+  } catch(e) {
+    setSyncUI('error', 'Erreur restauration Drive');
+    console.error('forceDownloadFromDrive', e);
+    alert('❌ Erreur lors de la restauration. Voir console.');
+  }
+}
+
+// Écrase le Drive avec les données locales (progression + LIVE_CONFIG).
+// Action destructive côté Drive — confirmation requise.
+async function forceUploadToDrive() {
+  if (!driveState.connected || !driveState.accessToken) {
+    alert('Drive non connecté.');
+    return;
+  }
+  const ok = confirm(
+    '⚠️ Écraser le Drive avec les données locales ?\n\n' +
+    'Toute la progression et la configuration sur le Drive seront remplacées ' +
+    'par celles de cet appareil.\n\n' +
+    'Cette action est irréversible.'
+  );
+  if (!ok) return;
+  setSyncUI('syncing', 'Envoi vers Drive…');
+  try {
+    driveState.data = getAllLocalData();
+    await saveToDrive();
+    await saveConfigToDrive();
+    const t = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    setSyncUI('connected', `Drive · upload forcé ${t}`);
+    alert('✅ Données locales envoyées vers Drive.');
+  } catch(e) {
+    setSyncUI('error', 'Erreur upload Drive');
+    console.error('forceUploadToDrive', e);
+    alert('❌ Erreur lors de l\'upload. Voir console.');
+  }
 }
 
 // ── STORAGE API ──
