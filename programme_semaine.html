@@ -449,16 +449,16 @@ body.admin-mode .timer-modal{display:none !important}
 
 const DAYS = [
   { id:'lun', label:'Lun', fullName:'Lundi', type:'bureau' },
-  { id:'mar', label:'Mar', fullName:'Mardi', type:'tele' },
-  { id:'mer', label:'Mer', fullName:'Mercredi', type:'bureauMuscu' },
+  { id:'mar', label:'Mar', fullName:'Mardi', type:'teleMuscu' },
+  { id:'mer', label:'Mer', fullName:'Mercredi', type:'bureau' },
   { id:'jeu', label:'Jeu', fullName:'Jeudi', type:'tele' },
   { id:'ven', label:'Ven', fullName:'Vendredi', type:'bureau' },
   { id:'sam', label:'Sam', fullName:'Samedi', type:'weekend' },
   { id:'dim', label:'Dim', fullName:'Dimanche', type:'weekend' },
 ];
 
-const TYPE_LABELS = { bureau:'Bureau + Vélo', bureauMuscu:'Bureau + Vélo + Muscu', tele:'Télétravail', weekend:'Week-end' };
-const TYPE_COLORS = { bureau:'bureau', bureauMuscu:'bureau', tele:'tele', weekend:'weekend' };
+const TYPE_LABELS = { bureau:'Bureau + Vélo', tele:'Télétravail', teleMuscu:'Télétravail + Muscu', weekend:'Week-end' };
+const TYPE_COLORS = { bureau:'bureau', tele:'tele', teleMuscu:'tele', weekend:'weekend' };
 const EX_TYPE_LABELS = { gainage:'Gainage', etirement:'Étirement', cardio:'Cardio', muscu:'Muscu', yoga:'Yoga', velo:'Vélo' };
 
 // SESSIONS — Séances livrées par défaut, indexées par type de jour.
@@ -507,16 +507,16 @@ const SESSIONS = {
     },
   ],
 
-  // ── Sessions bureau + muscu (Mer uniquement) ──
-  // bureauMuscu N'EST PAS un superset complet : c'est seulement la séance muscu
-  // jambes/dos qui REMPLACE le "Soir — Décompression lombaire" du mercredi.
-  // La composition complète (matin lombaire + vélos + cette muscu) est faite
-  // dynamiquement dans getSessionsForDay (cas 'bureauMuscu') — ainsi pas de
-  // duplication des sessions matin/vélo.
-  bureauMuscu: [
+  // ── Sessions télétravail + muscu (Mar uniquement) ──
+  // teleMuscu N'EST PAS un superset complet : c'est seulement la séance muscu
+  // jambes/dos qui REMPLACE le "Soir — Gainage intense" du mardi.
+  // La composition complète (matin gainage + midi cardio + cette muscu) est faite
+  // dynamiquement dans getSessionsForDay (cas 'teleMuscu') — ainsi pas de
+  // duplication des sessions matin/midi.
+  teleMuscu: [
     {
-      id:'muscu_mer', emoji:'🏋️', title:'Soir — Muscu jambes & dos',
-      desc:'Après le vélo retour · 35–40 min · objectif silhouette', duration:'35–40 min', difficulte:'Soutenu', kcal:280,
+      id:'muscu_mar', emoji:'🏋️', title:'Soir — Muscu jambes & dos',
+      desc:'Fin de journée · 35–40 min · objectif silhouette', duration:'35–40 min', difficulte:'Soutenu', kcal:280,
       isMuscu: true,
       note:'2e séance muscu de la semaine, ciblée jambes + tirages (le samedi couvre le haut du corps). Charge 4 kg/main pour démarrer ; augmenter via les boutons +/− quand les 12 reps sont fluides. Repos 60–90 s entre séries.',
       exercises:[
@@ -706,23 +706,45 @@ function isValidConfig(c) {
     && Array.isArray(c.sessions.weekend.dim);
 }
 
-// Migration silencieuse pour les configs sauvegardées avant l'ajout de
-// `bureauMuscu` (séance muscu mercredi). On garde version=1 pour rester compat
-// avec les fichiers Drive existants ; on s'assure juste que le mercredi pointe
-// sur le bon type et que la séance muscu existe dans sessions.
+// Migration silencieuse pour les configs sauvegardées sous l'ancien schéma
+// `bureauMuscu` (muscu placée le mercredi). Désormais la muscu est sur le mardi
+// soir (`teleMuscu`) et le mercredi redevient un jour bureau standard. On garde
+// version=1 pour rester compat avec les fichiers Drive existants.
 function migrateConfig(c) {
   if (!c) return c;
-  if (c.days && c.days[2] && c.days[2].id === 'mer' && c.days[2].type === 'bureau') {
-    c.days[2].type = 'bureauMuscu';
+  // Mercredi : revient à 'bureau'
+  if (c.days && c.days[2] && c.days[2].id === 'mer' && c.days[2].type === 'bureauMuscu') {
+    c.days[2].type = 'bureau';
   }
-  if (c.sessions && !c.sessions.bureauMuscu && DEFAULT_CONFIG.sessions.bureauMuscu) {
-    c.sessions.bureauMuscu = JSON.parse(JSON.stringify(DEFAULT_CONFIG.sessions.bureauMuscu));
+  // Mardi : passe à 'teleMuscu' uniquement si la config venait du schéma muscu
+  if (c.days && c.days[1] && c.days[1].id === 'mar' && c.days[1].type === 'tele'
+      && c.sessions && c.sessions.bureauMuscu) {
+    c.days[1].type = 'teleMuscu';
   }
-  if (c.typeLabels && !c.typeLabels.bureauMuscu) {
-    c.typeLabels.bureauMuscu = DEFAULT_CONFIG.typeLabels.bureauMuscu || 'Bureau + Vélo + Muscu';
+  // Renommage sessions.bureauMuscu → sessions.teleMuscu (rename id muscu_mer → muscu_mar)
+  if (c.sessions && c.sessions.bureauMuscu && !c.sessions.teleMuscu) {
+    const extras = JSON.parse(JSON.stringify(c.sessions.bureauMuscu));
+    extras.forEach(s => { if (s.id === 'muscu_mer') s.id = 'muscu_mar'; });
+    c.sessions.teleMuscu = extras;
   }
-  if (c.typeColors && !c.typeColors.bureauMuscu) {
-    c.typeColors.bureauMuscu = DEFAULT_CONFIG.typeColors.bureauMuscu || 'bureau';
+  if (c.sessions && c.sessions.bureauMuscu) {
+    delete c.sessions.bureauMuscu;
+  }
+  // Sécurité : garantit que teleMuscu existe pour les nouveaux clients
+  if (c.sessions && !c.sessions.teleMuscu && DEFAULT_CONFIG.sessions.teleMuscu) {
+    c.sessions.teleMuscu = JSON.parse(JSON.stringify(DEFAULT_CONFIG.sessions.teleMuscu));
+  }
+  if (c.typeLabels) {
+    if (!c.typeLabels.teleMuscu) {
+      c.typeLabels.teleMuscu = (DEFAULT_CONFIG.typeLabels && DEFAULT_CONFIG.typeLabels.teleMuscu) || 'Télétravail + Muscu';
+    }
+    if (c.typeLabels.bureauMuscu) delete c.typeLabels.bureauMuscu;
+  }
+  if (c.typeColors) {
+    if (!c.typeColors.teleMuscu) {
+      c.typeColors.teleMuscu = (DEFAULT_CONFIG.typeColors && DEFAULT_CONFIG.typeColors.teleMuscu) || 'tele';
+    }
+    if (c.typeColors.bureauMuscu) delete c.typeColors.bureauMuscu;
   }
   return c;
 }
@@ -1359,12 +1381,12 @@ function getSessionsForDay(dayId) {
     if (!w) return null;
     return w[dayId] || null;
   }
-  if (day.type === 'bureauMuscu') {
-    // Mercredi : composition dynamique = bureau (sans le soir lombaire) + muscu jambes/dos
-    // Pas de duplication des sessions matin/vélo : elles restent partagées avec lun/ven.
-    const bureau = LIVE_CONFIG.sessions.bureau || [];
-    const extras = LIVE_CONFIG.sessions.bureauMuscu || [];
-    return [...bureau.filter(s => s.id !== 'soir_bureau'), ...extras];
+  if (day.type === 'teleMuscu') {
+    // Mardi : composition dynamique = télétravail (sans le soir gainage) + muscu jambes/dos
+    // Pas de duplication des sessions matin/midi : elles restent partagées avec jeu.
+    const tele = LIVE_CONFIG.sessions.tele || [];
+    const extras = LIVE_CONFIG.sessions.teleMuscu || [];
+    return [...tele.filter(s => s.id !== 'soir_tele'), ...extras];
   }
   return LIVE_CONFIG.sessions[day.type];
 }
@@ -2928,11 +2950,11 @@ function getSessionsForDayConfig(dayId) {
     if (!LIVE_CONFIG.sessions.weekend[dayId]) LIVE_CONFIG.sessions.weekend[dayId] = [];
     return LIVE_CONFIG.sessions.weekend[dayId];
   }
-  if (day.type === 'bureauMuscu') {
-    // Côté admin : on n'expose que les sessions "extras" du mercredi (la muscu).
-    // Les sessions partagées (matin lombaire + vélos) sont éditées via lun/ven.
-    if (!LIVE_CONFIG.sessions.bureauMuscu) LIVE_CONFIG.sessions.bureauMuscu = [];
-    return LIVE_CONFIG.sessions.bureauMuscu;
+  if (day.type === 'teleMuscu') {
+    // Côté admin : on n'expose que les sessions "extras" du mardi (la muscu).
+    // Les sessions partagées (matin gainage + midi cardio) sont éditées via jeu.
+    if (!LIVE_CONFIG.sessions.teleMuscu) LIVE_CONFIG.sessions.teleMuscu = [];
+    return LIVE_CONFIG.sessions.teleMuscu;
   }
   if (!LIVE_CONFIG.sessions[day.type]) LIVE_CONFIG.sessions[day.type] = [];
   return LIVE_CONFIG.sessions[day.type];
@@ -2950,7 +2972,7 @@ function adminFindExercise(dayId, sessionId, exerciseId) {
 
 function adminCollectAllExerciseIds() {
   const all = [];
-  ['bureau','bureauMuscu','tele'].forEach(t => (LIVE_CONFIG.sessions[t]||[]).forEach(s => (s.exercises||[]).forEach(e => all.push(e.id))));
+  ['bureau','tele','teleMuscu'].forEach(t => (LIVE_CONFIG.sessions[t]||[]).forEach(s => (s.exercises||[]).forEach(e => all.push(e.id))));
   ['sam','dim'].forEach(d => (LIVE_CONFIG.sessions.weekend && LIVE_CONFIG.sessions.weekend[d]||[]).forEach(s => (s.exercises||[]).forEach(e => all.push(e.id))));
   return all;
 }
