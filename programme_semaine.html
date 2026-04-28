@@ -277,6 +277,8 @@ body:not(.admin-mode) .admin-container{display:none}
 .admin-node-day{font-weight:600}
 .admin-node-session{margin-left:14px}
 .admin-node-exercise{margin-left:30px;color:var(--muted);font-size:12px}
+.admin-node-shared .admin-node-label{color:var(--muted);font-style:italic}
+.admin-shared-badge{background:var(--tele-bg);color:var(--tele);border:1px solid var(--tele);text-transform:none;letter-spacing:0;font-weight:500}
 .admin-node-caret{font-size:10px;color:var(--muted2);width:12px;flex-shrink:0;text-align:center}
 .admin-node-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .admin-node-add{margin-left:28px;color:var(--muted2);font-size:12px;padding:3px 6px;cursor:pointer;border-radius:4px;display:inline-block}
@@ -3009,6 +3011,20 @@ function renderAdminTree() {
       <span class="admin-type-badge">${day.type}</span>
     </div>`;
     if (dayExpanded) {
+      // Pour les jours teleMuscu (mardi) : afficher AUSSI les sessions partagées
+      // avec jeudi, en lecture seule. Cliquer dessus sélectionne la session
+      // sous jeudi (où elle est réellement stockée et éditable).
+      if (day.type === 'teleMuscu') {
+        const sharedSessions = (LIVE_CONFIG.sessions.tele || []).filter(s => s.id !== 'soir_tele');
+        sharedSessions.forEach(s => {
+          const sSel = isNodeSelected('session', 'jeu', s.id) ? 'selected' : '';
+          html += `<div class="admin-node admin-node-session admin-node-shared ${sSel}" data-kind="session" data-day="jeu" data-session="${s.id}" title="Partagée avec jeudi — clique pour éditer depuis jeudi">
+            <span class="admin-node-caret"></span>
+            <span class="admin-node-label">${adminEscapeHTML((s.emoji||'')+' '+(s.title||'(sans titre)'))}</span>
+            <span class="admin-type-badge admin-shared-badge">↗ jeu</span>
+          </div>`;
+        });
+      }
       const sessions = getSessionsForDayConfig(day.id);
       sessions.forEach(s => {
         const key = adminKey(day.id, s.id);
