@@ -6,8 +6,9 @@ Application web autonome (fichier HTML unique) pour suivre un programme fitness 
 
 ### Planning hebdomadaire
 - **Lundi / Mercredi / Vendredi** — Jours bureau : séance matin + vélo aller/retour (2 × 10 km) + décompression soir
-- **Mardi / Jeudi** — Télétravail : 3 séances gainage (matin / midi / soir)
-- **Samedi** — Grande séance 1h–1h30 : échauffement + gainage pré-muscu + musculation haltères/banc + étirements
+- **Mardi** — Télétravail + muscu : matin gainage + midi cardio + soir muscu jambes/dos (35–40 min, haltères 4 kg/main)
+- **Jeudi** — Télétravail : 3 séances gainage (matin activation + midi circuit abdo/cardio + soir gainage intense)
+- **Samedi** — Grande séance 1h–1h30 : échauffement + gainage pré-muscu + musculation haut du corps (haltères/banc) + étirements
 - **Dimanche** — Yoga doux 45–60 min adapté (dos raide, ventre proéminent)
 
 ### Navigation intelligente (auto-ouverture)
@@ -65,6 +66,15 @@ Chaque exercice expose un slider 50 %–150 % (pas 5 %, défaut 100 %) qui multi
 - La configuration du programme (mode admin, import/export) reste indépendante du scaling : un fichier de config échangé entre utilisateurs ne transporte pas les scales personnels.
 - Modifier le slider **pendant** une série active n'affecte pas la série en cours (la valeur est figée au démarrage) — la nouvelle intensité s'applique à la série suivante.
 
+### Charge ajustable (haltères)
+
+Les exercices avec une charge au format `N×K kg` (ex: `2×4 kg`) exposent deux boutons **−1 kg** / **+1 kg** sous l'intensité.
+
+- Borne 0 kg (mouvement à vide) → 50 kg, pas de 1 kg.
+- Tag charge sur la carte d'exercice qui passe en orange dès qu'on a modifié la valeur par défaut.
+- Repris dans la modale timer plein écran (à côté du badge d'intensité).
+- Persisté **par exercice**, hors `LIVE_CONFIG` — donc préservé même après import/export d'une config externe.
+
 ### Mode administration
 
 Un bouton ⚙ dans la barre supérieure bascule vers un éditeur de configuration (jours, sessions, exercices, séries, vélo, subExos).
@@ -86,18 +96,25 @@ Un bouton ⚙ dans la barre supérieure bascule vers un éditeur de configuratio
 
 ### Synchronisation Google Drive
 - Deux fichiers distincts sur Drive :
-  - `fitness_programme_semaine.json` — progression (checks + journal par semaine + slider d'intensité par exercice)
+  - `fitness_programme_semaine.json` — progression (checks + journal par semaine + slider d'intensité + charges haltères)
   - `fitness_programme_config.json` — configuration du programme (éditée via le mode admin)
 - Sync automatique après chaque action (debounce 2 s — plusieurs actions rapides = 1 seul envoi)
 - Fallback localStorage si hors ligne
 - Restauration silencieuse de session au rechargement de page (prompt:'none')
 - En cas de conflit : les données Drive sont prioritaires sur le cache local
+- **Boutons d'override** dans la barre de sync (visibles une fois connecté, confirmation requise) :
+  - **⬇ Drive** — écrase les données locales avec celles du Drive (utile si on veut aligner un nouvel appareil)
+  - **⬆ Local** — écrase le Drive avec les données locales (utile pour pousser des modifications faites hors ligne)
 
 ## Équipement requis
 
-- Banc de musculation inclinable + déclinable
-- 4 haltères à main (2 kg chacune)
-- Disques : 0,5 kg / 1 kg / 2 kg
+- 4 barres d'haltères à une main de 2 kg
+- 4 disques de 2 kg
+- 6 disques de 1 kg
+- 6 disques de 500 g
+- Tapis de yoga
+- Banc inclinable avec barre pour abdos à l'opposé
+- Encadrement de porte (utilisé en remplacement d'un mur ou d'un angle de mur, indisponibles)
 
 ## Installation et utilisation
 

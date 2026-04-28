@@ -6,12 +6,42 @@ Guide de développement pour Claude. Ce fichier décrit l'architecture, les conv
 
 ## Vue d'ensemble
 
-Fichier unique : `programme_semaine.html` (~3350 lignes).
+Fichier unique : `programme_semaine.html` (~3750 lignes).
 Aucune dépendance externe. Tout est en HTML/CSS/JS vanilla dans un seul fichier.
 
 Deux modes utilisateur cohabitent :
 - **Mode utilisateur** (par défaut) : programme + suivi + modale timer.
 - **Mode admin** : éditeur de configuration (⚙ dans la topbar). La classe `body.admin-mode` masque `overview-bar`, `day-tabs`, `day-panels` et la modale timer, et affiche `.admin-container`.
+
+---
+
+## Profil utilisateur (mémoire)
+
+Informations à conserver à l'esprit pour toute proposition d'exercice ou ajustement du programme.
+
+### Caractéristiques physiques
+
+- Homme, 44 ans
+- 1,95 m, 100 kg
+- Mal au bas du dos (lombalgie chronique légère) → privilégier renforcement profond (transverse, multifides), proscrire les charges lourdes en flexion vertébrale et les rotations rapides
+- Objectifs : silhouette + dos solide, niveau débutant, progression douce
+
+### Matériel à disposition
+
+- **4 barres d'haltères à une main** de 2 kg chacune (charge de la barre seule)
+- **4 disques de 2 kg**
+- **6 disques de 1 kg**
+- **6 disques de 500 g**
+- **Tapis de yoga**
+- **Banc inclinable** avec **barre pour abdos à l'opposé** (banc déclinable côté abdos)
+- **Encadrement de porte** disponible — utilisé en remplacement d'un mur ou d'un angle de mur (indisponibles dans la pièce)
+
+### Conséquences pour le programme
+
+- **Charge max par main** : barre 2 kg + 2× disques 2 kg = 6 kg/main, ou barre 2 kg + 2× disques 2 kg + 2× disques 1 kg = 8 kg/main si on monte les disques en sandwich. Avec les 4 barres, on peut équiper 2 paires en parallèle (utile pour superset sans changer les disques).
+- **Pas de mur disponible** : éviter les exercices qui exigent un appui mural strict (handstand, wall sit prolongé, étirement épaule au mur). Substituer par l'encadrement de porte (pull, étirement pectoral à la porte) ou des variantes au sol.
+- **Banc inclinable** : ouvre les exercices en pente positive/négative (développé incliné, crunch sur banc déclinable via la barre abdo). À privilégier pour le haut du corps le samedi.
+- **Pas de barre longue ni de rack** : tout le programme reste en haltères / poids du corps. Ne JAMAIS proposer un exercice qui suppose une barre olympique, un squat rack ou une cage.
 
 ---
 
@@ -26,14 +56,19 @@ programme_semaine.html
 └── <script>
     ├── DATA         DEFAULT_CONFIG (days, typeLabels, typeColors, sessions),
     │                LIVE_CONFIG, CONFIG_STORAGE_KEY
-    ├── CONFIG API   cloneDefaultConfig, isValidConfig, loadConfig, saveConfig,
-    │                scheduleSaveConfig, loadConfigFromDrive, saveConfigToDrive
+    ├── CONFIG API   cloneDefaultConfig, isValidConfig, migrateConfig, loadConfig,
+    │                saveConfig, scheduleSaveConfig, loadConfigFromDrive,
+    │                saveConfigToDrive
     ├── SCALES       SCALES_STORAGE_KEY, EXERCISE_SCALES, loadScales,
     │                getExerciseScale, saveScale (slider 50–150 %)
+    ├── WEIGHTS      WEIGHTS_STORAGE_KEY, EXERCISE_WEIGHTS, loadWeights,
+    │                parseCharge, hasAdjustableWeight, getExerciseWeight,
+    │                saveWeight, chargeDisplay (boutons +/− 1 kg)
     ├── STATE        currentWeekOffset, activeDay, timers, serieTimers,
     │                modalState, driveState
     ├── GOOGLE DRIVE OAuth2, load/save Drive (progression + config séparés),
-    │                scheduleSave, fallback localStorage
+    │                scheduleSave, fallback localStorage,
+    │                forceDownloadFromDrive / forceUploadToDrive (override)
     ├── RENDER       getSessionsForDay, countExercises, renderAllPanels,
     │                renderDayPanel, renderSeriesTracker, renderRepTracker,
     │                renderSubExoTracker, renderOverview, renderTabs
@@ -57,8 +92,8 @@ programme_semaine.html
     │                adminAdd/Move/Duplicate/Delete (Session|Exercise),
     │                adminSubExo*, adminConvertToCombined/Simple,
     │                adminExportConfig, adminImportConfig, adminResetConfig
-    └── INIT         IIFE de boot : loadConfig → loadScales → rendu →
-                     tryRestoreToken (différé 800 ms) → Wake Lock
+    └── INIT         IIFE de boot : loadConfig → loadScales → loadWeights →
+                     rendu → tryRestoreToken (différé 800 ms) → Wake Lock
 ```
 
 ---
@@ -69,14 +104,31 @@ Les sessions vivent désormais dans `LIVE_CONFIG.sessions` (voir section *Systè
 
 ```javascript
 LIVE_CONFIG.sessions = {
-  bureau: [ ...sessions ],   // Lun, Mer, Ven
-  tele:   [ ...sessions ],   // Mar, Jeu
+  bureau:    [ ...sessions ],   // Lun, Mer, Ven
+  tele:      [ ...sessions ],   // Jeu uniquement (matin + midi + soir gainage)
+  teleMuscu: [ ...sessions ],   // Mar — extras qui REMPLACENT le soir gainage
+                                //       (composition dynamique, voir ci-dessous)
   weekend: {
     sam: [ ...sessions ],
     dim: [ ...sessions ],
   }
 }
 ```
+
+### Cas particulier `teleMuscu` (mardi)
+
+Le mardi est de type `teleMuscu` : `getSessionsForDay('mar')` compose dynamiquement la liste des séances du jour à partir de deux buckets :
+
+```javascript
+[...LIVE_CONFIG.sessions.tele.filter(s => s.id !== 'soir_tele'),
+ ...LIVE_CONFIG.sessions.teleMuscu]
+```
+
+Concrètement : matin gainage + midi cardio (partagés avec le jeudi) + soir muscu jambes/dos (`muscu_mar`, propre au mardi). Cette composition garantit qu'on ne duplique pas matin/midi : éditer `matin_tele` côté admin met aussi à jour le mardi.
+
+Conséquence côté admin : le bucket `teleMuscu` n'expose que les sessions « extras » du mardi (la muscu). Les sessions partagées (matin/midi) sont éditables uniquement via le jeudi (un badge « partagé » est affiché côté arbre admin du mardi pour matin/midi).
+
+Migration : `migrateConfig()` ramène silencieusement les configs sauvegardées sous l'ancien schéma `bureauMuscu` (muscu placée le mercredi) vers `teleMuscu` (mardi). On reste en `version: 1` pour compat avec les fichiers Drive existants. `isValidConfig` n'exige PAS le bucket `teleMuscu` (sécurité : ré-injecté par migration si manquant).
 
 ### Objet session
 
@@ -395,14 +447,17 @@ journal = { rating: 1-5, feeling: 'string', note: 'string' }
 ### Google Drive
 
 - Deux fichiers distincts, tous deux avec scope `drive.file` (accès restreint aux fichiers créés par l'app) :
-  - `fitness_programme_semaine.json` — progression (checks + journal par semaine)
+  - `fitness_programme_semaine.json` — progression (checks + journal par semaine + `EXERCISE_SCALES` + `EXERCISE_WEIGHTS`)
   - `fitness_programme_config.json` — configuration du programme (`LIVE_CONFIG`)
 - Sync progression : debounce 2 s via `scheduleSave` / `saveToDrive`
 - Sync config : debounce 2 s via `scheduleSaveConfig` / `saveConfigToDrive`
 - Fallback : localStorage si non connecté
-- Au chargement progression : merge localStorage + Drive (`Object.assign({}, local, remote)` — Drive prioritaire)
-- Au chargement config : `loadConfigFromDrive` écrase `LIVE_CONFIG` + miroir localStorage si le fichier Drive passe `isValidConfig`
-- Token restauré silencieusement via `tryRestoreToken()` (appelé 800 ms après init)
+- Au chargement progression : merge localStorage + Drive (`Object.assign({}, local, remote)` — Drive prioritaire), puis hydrate `EXERCISE_SCALES` et `EXERCISE_WEIGHTS` depuis Drive si présents
+- Au chargement config : `loadConfigFromDrive` écrase `LIVE_CONFIG` + miroir localStorage si le fichier Drive passe `isValidConfig` (après `migrateConfig`)
+- Token : stocké en localStorage avec expiry (3500 s ≈ 58 min) via `saveTokenToStorage`. Restauré silencieusement via `tryRestoreToken()` (appelé 800 ms après init) — soit réutilisation directe si encore valide, soit refresh via `prompt:'none'`
+- **Boutons override** dans la barre de sync (visibles uniquement quand connecté) :
+  - `forceDownloadFromDrive()` — efface localStorage (progression + scales + weights + config) puis recharge tout depuis Drive. Confirmation requise.
+  - `forceUploadToDrive()` — pousse `getAllLocalData()` + `LIVE_CONFIG` vers les deux fichiers Drive. Confirmation requise.
 
 ---
 
@@ -421,7 +476,8 @@ LIVE_CONFIG = {
   typeColors: {...},    // mapping type → couleur
   sessions: {           // identique à l'ancienne constante SESSIONS
     bureau: [...],
-    tele: [...],
+    tele: [...],          // jeudi (matin + midi + soir gainage)
+    teleMuscu: [...],     // mardi (extras = muscu jambes/dos)
     weekend: { sam: [...], dim: [...] }
   }
 }
@@ -430,19 +486,20 @@ LIVE_CONFIG = {
 ### Priorité de chargement (au boot)
 
 1. `DEFAULT_CONFIG` cloné dans `LIVE_CONFIG` — programme livré par défaut
-2. `localStorage[CONFIG_STORAGE_KEY]` s'il existe et passe `isValidConfig`
-3. Drive (`fitness_programme_config.json`) s'il existe et passe `isValidConfig` — écrase les deux précédents
+2. `localStorage[CONFIG_STORAGE_KEY]` s'il existe et passe `isValidConfig` (passe également `migrateConfig`)
+3. Drive (`fitness_programme_config.json`) s'il existe et passe `isValidConfig` — écrase les deux précédents (passe également `migrateConfig`)
 
 ### API
 
 | Fonction | Rôle |
 |----------|------|
 | `cloneDefaultConfig()` | Deep-clone de `DEFAULT_CONFIG` avec meta fraîche (`source: 'default'`) |
-| `isValidConfig(c)` | Vérifie version, days (len 7), typeLabels, typeColors, sessions.bureau/tele/weekend.sam/dim |
-| `loadConfig()` | Lit `localStorage`, fallback sur `cloneDefaultConfig()` si absent/invalide |
+| `isValidConfig(c)` | Vérifie version, days (len 7), typeLabels, typeColors, sessions.bureau/tele/weekend.sam/dim. **Note** : `teleMuscu` n'est pas exigé — `migrateConfig` le ré-injecte au besoin |
+| `migrateConfig(c)` | Conversion silencieuse des anciens schémas : `bureauMuscu` (mer) → `teleMuscu` (mar), rename `muscu_mer` → `muscu_mar`, garantit l'existence de `sessions.teleMuscu` + `typeLabels.teleMuscu` + `typeColors.teleMuscu` |
+| `loadConfig()` | Lit `localStorage`, applique `migrateConfig`, fallback sur `cloneDefaultConfig()` si absent/invalide |
 | `saveConfig(newConfig, source)` | Valide, met à jour `meta.lastModified`, assigne `LIVE_CONFIG`, miroir localStorage, planifie sync Drive |
 | `scheduleSaveConfig()` | Debounce 2 s avant `saveConfigToDrive()` |
-| `loadConfigFromDrive()` / `saveConfigToDrive()` | I/O sur `fitness_programme_config.json` |
+| `loadConfigFromDrive()` / `saveConfigToDrive()` | I/O sur `fitness_programme_config.json` (le load passe `migrateConfig`) |
 
 ### Règle critique
 
@@ -568,18 +625,21 @@ Activé par `toggleAdminMode()` (bouton ⚙ en topbar). Ajoute `body.admin-mode`
 
 ## Conventions de nommage des IDs
 
-| Préfixe | Contexte |
-|---------|----------|
-| `b_m*`  | Bureau matin |
-| `b_s*`  | Bureau soir |
-| `t_m*`  | Télétravail matin |
-| `t_mi*` | Télétravail midi |
-| `t_s*`  | Télétravail soir |
-| `s_e*`  | Samedi échauffement |
-| `s_g*`  | Samedi gainage pré-muscu |
-| `s_mu*` | Samedi musculation |
-| `s_p*`  | Samedi post-effort |
-| `d_y*`  | Dimanche yoga |
+| Préfixe  | Contexte |
+|----------|----------|
+| `b_m*`   | Bureau matin |
+| `b_s*`   | Bureau soir |
+| `b_mu*`  | Mardi muscu (jambes/dos) — préfixe historique conservé pour ne pas invalider la progression existante stockée sous ces IDs |
+| `t_m*`   | Télétravail matin |
+| `t_mi*`  | Télétravail midi |
+| `t_s*`   | Télétravail soir |
+| `s_e*`   | Samedi échauffement |
+| `s_g*`   | Samedi gainage pré-muscu |
+| `s_mu*`  | Samedi musculation (haut du corps) |
+| `s_p*`   | Samedi post-effort |
+| `d_y*`   | Dimanche yoga |
+
+Ids de session : `matin_*`, `midi_*`, `soir_*`, `velo_matin`, `velo_soir`, `muscu_mar` (séance muscu mardi), `muscu_sam` (samedi).
 
 ### IDs dynamiques (séries)
 
@@ -597,19 +657,22 @@ Ces IDs sont utilisés comme clés dans l'objet `serieTimers` et comme suffixes 
 
 Tout se joue dans l'IIFE `(function init(){…})()` à la fin du `<script>` :
 
-1. **`loadConfig()`** — hydrate `LIVE_CONFIG` depuis `localStorage` (ou `cloneDefaultConfig()` en fallback). DOIT précéder tout rendu : les fonctions de rendu lisent `LIVE_CONFIG`, pas les constantes figées.
+1. **`loadConfig()`** — hydrate `LIVE_CONFIG` depuis `localStorage` (ou `cloneDefaultConfig()` en fallback), avec passage par `migrateConfig()` pour les anciens schémas (`bureauMuscu` → `teleMuscu`). DOIT précéder tout rendu : les fonctions de rendu lisent `LIVE_CONFIG`, pas les constantes figées.
 2. **`EXERCISE_SCALES = loadScales()`** — hydrate les scales utilisateur depuis `localStorage[SCALES_STORAGE_KEY]`. DOIT précéder tout rendu : les helpers `scaledSec` / `scaledSubSec` / `scaledRepsString` les lisent à chaque appel.
-3. **Détection du jour courant** — `getDay()` (JS : 0=dim) est remappé via `dayMap = [6,0,1,2,3,4,5]` vers l'index dans `LIVE_CONFIG.days` (0=lun).
-4. **Rendu UI** — `updateWeekDisplay`, `renderAllPanels`, `renderTabs`, `renderOverview`.
-5. **Bind admin events** — `bindAdminTreeEvents()`, `bindAdminEditorEvents()` (nécessaires même en mode utilisateur : les containers admin existent déjà dans le DOM).
-6. **Différé 800 ms : `tryRestoreToken()`** — laisse la lib `gsi/client` finir son chargement asynchrone. Si un token valide existe, `loadFromDrive()` écrase `LIVE_CONFIG` (config Drive prioritaire) puis fusionne la progression + les scales, puis re-rend l'UI.
-7. **Wake Lock** — première demande + écoute `visibilitychange` pour redemander au retour d'onglet (le lock est automatiquement relâché quand l'onglet n'est plus visible).
+3. **`EXERCISE_WEIGHTS = loadWeights()`** — hydrate les charges haltères ajustées depuis `localStorage[WEIGHTS_STORAGE_KEY]`. DOIT précéder tout rendu : `chargeDisplay` / `getExerciseWeight` les lisent à chaque appel pour rendre le tag charge et les +/− boutons.
+4. **Détection du jour courant** — `getDay()` (JS : 0=dim) est remappé via `dayMap = [6,0,1,2,3,4,5]` vers l'index dans `LIVE_CONFIG.days` (0=lun).
+5. **Rendu UI** — `updateWeekDisplay`, `renderAllPanels`, `renderTabs`, `renderOverview`.
+6. **Bind admin events** — `bindAdminTreeEvents()`, `bindAdminEditorEvents()` (nécessaires même en mode utilisateur : les containers admin existent déjà dans le DOM).
+7. **Différé 800 ms : `tryRestoreToken()`** — laisse la lib `gsi/client` finir son chargement asynchrone. Si un token valide existe, `loadFromDrive()` écrase `LIVE_CONFIG` (config Drive prioritaire, passe également `migrateConfig`) puis fusionne la progression + les scales + les weights, puis re-rend l'UI.
+8. **Wake Lock** — première demande + écoute `visibilitychange` pour redemander au retour d'onglet (le lock est automatiquement relâché quand l'onglet n'est plus visible).
 
-> **Règle critique** : ne jamais déclencher un rendu avant les étapes 1 et 2. Sinon `LIVE_CONFIG` vaut son état post-module (un simple clone de `DEFAULT_CONFIG`) et les scales utilisateur sont ignorés jusqu'au prochain boot.
+> **Règle critique** : ne jamais déclencher un rendu avant les étapes 1, 2 et 3. Sinon `LIVE_CONFIG` vaut son état post-module (un simple clone de `DEFAULT_CONFIG`) et les scales/weights utilisateur sont ignorés jusqu'au prochain boot.
 
 ---
 
 ## Points d'attention lors des modifications
+
+### Règles techniques (code & données)
 
 - **Ajouter un exercice** : vérifier que l'ID est unique dans tout le fichier
 - **Modifier `reps`** : recalculer `sec` selon le tableau ci-dessus
@@ -625,3 +688,11 @@ Tout se joue dans l'IIFE `(function init(){…})()` à la fin du `<script>` :
 - **Nouveau libellé de phase** : ajouter la clé dans l'objet `labels` de `updateTimerModal` et la classe CSS correspondante (`.tm-phase.<nom>`)
 - **Champ éditable côté admin** : ajouter le contrôle dans `renderAdminEditor`, le handler dans `bindAdminEditorEvents`/`adminApplyFieldEdit`, et toujours appeler `saveConfig(...)` — ne jamais muter `LIVE_CONFIG` directement sans passer par `saveConfig`
 - **Import/export** : le JSON échangé doit passer `isValidConfig` — si on étend le schéma, bumper `version` et mettre à jour `isValidConfig` en conséquence
+- **Schéma `sessions`** : si on ajoute un nouveau bucket (autre que `bureau`/`tele`/`teleMuscu`/`weekend`), penser à `migrateConfig` et au cas correspondant dans `getSessionsForDay`
+
+### Règles fitness (cf. profil utilisateur ci-dessus)
+
+- **Charge max réaliste** : 8 kg / main (barre 2 kg + 2× 2 kg + 2× 1 kg). Au-delà → manque de matériel. Toute charge `> "2×8 kg"` dans une config est suspecte — vérifier que le `+1 kg` côté utilisateur peut atteindre la valeur, pas la valeur par défaut.
+- **Bas du dos sensible** : éviter les exercices à fort cisaillement lombaire (good morning lourd, hyperextension chargée, deadlift jambes tendues lourd). Préférer SDT roumain léger, pont fessier, bird dog, dead bug.
+- **Pas de mur** : ne jamais introduire un exercice qui suppose un appui mural strict. L'encadrement de porte est utilisable pour `pull-up assisté`, étirement pectoral, étirement épaule.
+- **Pas de barre/rack** : tout doit rester réalisable en haltères ou poids du corps.

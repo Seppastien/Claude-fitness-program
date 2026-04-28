@@ -374,7 +374,12 @@ body.admin-mode .timer-modal{display:none !important}
   </div>
 </div>
 
-<!-- ── Barre de sync Google Drive ── -->
+<!-- ── Barre de sync Google Drive ──
+     - Bouton primaire : "Connecter Drive" (puis "Synchronisé ✓"/"⟳ Sync…"/"Réessayer").
+     - Boutons override (visibles uniquement quand connecté) :
+         ⬇ Drive  → forceDownloadFromDrive : écrase les données locales avec le Drive
+         ⬆ Local  → forceUploadToDrive    : écrase le Drive avec les données locales
+       Les deux demandent confirmation (action irréversible). -->
 <div class="sync-bar" id="sync-bar">
   <div class="sync-status">
     <div class="sync-dot" id="sync-dot"></div>
@@ -464,9 +469,12 @@ const TYPE_COLORS = { bureau:'bureau', tele:'tele', teleMuscu:'tele', weekend:'w
 const EX_TYPE_LABELS = { gainage:'Gainage', etirement:'Étirement', cardio:'Cardio', muscu:'Muscu', yoga:'Yoga', velo:'Vélo' };
 
 // SESSIONS — Séances livrées par défaut, indexées par type de jour.
-//   bureau  : Lun / Mer / Ven (matin + vélo aller/retour + soir)
-//   tele    : Mar / Jeu (3 séances gainage)
-//   weekend : Sam (muscu 1h–1h30) / Dim (yoga doux)
+//   bureau    : Lun / Mer / Ven (matin gainage + vélo aller/retour + soir décompression)
+//   tele      : Jeu (matin gainage + midi cardio + soir gainage intense)
+//   teleMuscu : Mar — composition dynamique = matin gainage + midi cardio
+//               + muscu jambes/dos qui REMPLACE le soir gainage du mardi.
+//               Voir getSessionsForDay (cas 'teleMuscu') pour la fusion.
+//   weekend   : Sam (muscu haut du corps 1h–1h30) / Dim (yoga doux 45–60 min)
 // Éditée à l'exécution via le mode admin → LIVE_CONFIG.sessions.
 const SESSIONS = {
 
@@ -666,12 +674,15 @@ const SESSIONS = {
 //                  et par le mode admin.
 // Priorité au boot (cf. init() en bas de fichier) :
 //   1. clone DEFAULT_CONFIG → LIVE_CONFIG
-//   2. loadConfig() remplace par localStorage si valide
+//   2. loadConfig() remplace par localStorage si valide (passe migrateConfig)
 //   3. loadConfigFromDrive() écrase par Drive si le fichier passe isValidConfig
+//      (passe également migrateConfig)
 // Persistance : double — localStorage (CONFIG_STORAGE_KEY) + Drive
 //               (fichier fitness_programme_config.json, debounce 2 s).
 // Validation  : toute config (locale, Drive, importée) DOIT passer isValidConfig
 //               avant d'écraser LIVE_CONFIG.
+// Migration   : migrateConfig() convertit silencieusement les anciens schémas
+//               (bureauMuscu sur mer → teleMuscu sur mar) sans bumper version.
 
 const DEFAULT_CONFIG = {
   version: 1,
@@ -3687,20 +3698,24 @@ function adminResetConfig() {
 // Ordre d'exécution au boot (IIFE auto-exécutée ci-dessous) :
 //   1. loadConfig() — hydrate LIVE_CONFIG depuis localStorage (ou clone
 //      DEFAULT_CONFIG en fallback). DOIT précéder tout rendu : tout le rendu
-//      lit LIVE_CONFIG.
+//      lit LIVE_CONFIG. Une migration silencieuse (migrateConfig) ramène les
+//      anciens schémas (bureauMuscu) vers le schéma courant (teleMuscu).
 //   2. loadScales() — hydrate EXERCISE_SCALES (slider d'intensité) depuis
 //      localStorage. Doit précéder le rendu pour que les helpers scaled*
 //      affichent les bonnes valeurs dès le premier rendu.
-//   3. Détection du jour courant : new Date().getDay() (JS, Sunday=0) est
+//   3. loadWeights() — hydrate EXERCISE_WEIGHTS (charge haltères ajustée par
+//      l'utilisateur). Même règle : doit précéder le rendu pour que
+//      chargeDisplay() lise les bons kg dès le premier affichage.
+//   4. Détection du jour courant : new Date().getDay() (JS, Sunday=0) est
 //      remappé via dayMap vers l'index dans LIVE_CONFIG.days (Monday=0).
-//   4. Rendu de l'UI (panneaux, onglets, overview) + bind des events admin
+//   5. Rendu de l'UI (panneaux, onglets, overview) + bind des events admin
 //      (containers admin existent déjà dans le DOM même hors admin-mode).
-//   5. Différé 800 ms : tryRestoreToken() — laisse la lib Google (gsi/client)
+//   6. Différé 800 ms : tryRestoreToken() — laisse la lib Google (gsi/client)
 //      finir son chargement asynchrone. Si un token valide existe, loadFromDrive()
 //      écrase LIVE_CONFIG (config Drive prioritaire), hydrate EXERCISE_SCALES
-//      depuis le fichier progression, fusionne les checks/journal, puis
-//      re-rend l'UI.
-//   6. Wake Lock : empêche la mise en veille de l'écran pendant une séance,
+//      et EXERCISE_WEIGHTS depuis le fichier progression, fusionne les
+//      checks/journal, puis re-rend l'UI.
+//   7. Wake Lock : empêche la mise en veille de l'écran pendant une séance,
 //      re-demandé à chaque retour de visibilité (le lock est relâché quand
 //      l'onglet n'est plus visible).
 
