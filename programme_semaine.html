@@ -166,12 +166,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .sync-dot.connected{background:#2E7D52}
 .sync-dot.syncing{background:var(--gold);animation:pulse .8s infinite alternate}
 .sync-dot.error{background:var(--red)}
+.sync-dot.unsynced{background:#E07B00;animation:pulse 1.4s infinite alternate}
 @keyframes pulse{from{opacity:.4}to{opacity:1}}
 .sync-lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sync-btn{font-size:11px;padding:4px 12px;border:1px solid var(--border2);border-radius:20px;background:none;cursor:pointer;color:var(--muted);white-space:nowrap;transition:all .15s;flex-shrink:0}
 .sync-btn:hover{background:var(--surface2);color:var(--text)}
 .sync-btn.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
 .sync-btn.primary:hover{opacity:.85}
+.sync-btn.warning{background:#E07B00;color:white;border-color:#E07B00}
+.sync-btn.warning:hover{opacity:.85}
 .sync-btn.sync-direction{font-family:'DM Mono',monospace;font-size:10px;padding:4px 8px}
 .sync-btn[hidden]{display:none}
 
@@ -968,10 +971,28 @@ const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 let driveState = {
   connected: false, accessToken: null,
   fileId: null, configFileId: null,
-  syncing: false, data: {}, saveTimer: null, configSaveTimer: null
+  syncing: false, data: {}, saveTimer: null, configSaveTimer: null,
+  // ── Robustesse sync (cf. fix bug perte données PC↔Drive↔téléphone) ──
+  dirtyKeys: new Set(),       // clés `fitness_w…` modifiées non confirmées 2xx côté Drive
+  dirtyConfig: false,         // LIVE_CONFIG modifié non confirmé 2xx côté Drive
+  retryTimer: null,           // setTimeout du backoff (5s/15s/60s) en cas d'erreur transitoire
+  retryAttempt: 0,            // 0 → 1 → 2 → 3 (3 tentatives max). Reset à 0 sur succès.
+  heartbeatTimer: null,       // setInterval pour silent refresh proactif (50 min)
+  deadTokenAlerted: false     // a déjà alert() la perte de session — évite le spam à chaque edit
 };
 
+// Délais de retry (ms) en cas d'erreur transitoire (5xx, réseau).
+// 401 a son propre flux (silent refresh + retry unique immédiat dans saveToDrive).
+const SYNC_RETRY_DELAYS = [5000, 15000, 60000];
+// Heartbeat proactif : refresh silencieux du token avant qu'il n'expire côté Google.
+// La fenêtre Google est ~60 min, on refresh à 50 min pour avoir une marge.
+const SYNC_HEARTBEAT_MS = 50 * 60 * 1000;
+
 // ── UI Sync ──
+// États possibles : 'connected' (vert ✓) · 'syncing' (gold pulse) · 'error' (rouge) ·
+// 'unsynced' (orange ⚠ — modifications locales pas encore confirmées Drive) · '' (gris).
+// L'état 'unsynced' est posé par refreshSyncBadge dès qu'il y a du dirty,
+// et retiré dès que saveToDrive/saveConfigToDrive a vu un 2xx.
 function setSyncUI(state, label) {
   const dot = document.getElementById('sync-dot');
   const lbl = document.getElementById('sync-label');
@@ -983,11 +1004,33 @@ function setSyncUI(state, label) {
   if (state === 'connected') { btn.textContent = 'Synchronisé ✓'; btn.className = 'sync-btn'; }
   else if (state === 'syncing') { btn.textContent = '⟳ Sync…'; btn.className = 'sync-btn'; }
   else if (state === 'error') { btn.textContent = 'Réessayer'; btn.className = 'sync-btn primary'; }
+  else if (state === 'unsynced') { btn.textContent = '⚠ Sync maintenant'; btn.className = 'sync-btn warning'; }
   else { btn.textContent = 'Connecter Drive'; btn.className = 'sync-btn primary'; }
   // Boutons de direction (download/upload forcé) — visibles uniquement quand un token est actif.
   const showDirBtns = !!driveState.connected;
   if (dlBtn) dlBtn.hidden = !showDirBtns;
   if (upBtn) upBtn.hidden = !showDirBtns;
+}
+
+// refreshSyncBadge : appelé après toute mutation de driveState.dirtyKeys/dirtyConfig
+// ou de l'état réseau. Calcule le bon état UI à partir du state interne.
+//   - non connecté → état neutre, label "Non connecté"
+//   - dirty count > 0 → 'unsynced' avec compteur
+//   - sinon → laisse le label posé par le dernier save réussi (pas de mise à jour)
+// On NE bascule PAS vers 'connected' depuis ici : c'est le job de saveToDrive après 2xx.
+function refreshSyncBadge() {
+  if (!driveState.connected) {
+    setSyncUI('', 'Non connecté — données locales uniquement');
+    return;
+  }
+  const dirtyCount = driveState.dirtyKeys.size + (driveState.dirtyConfig ? 1 : 0);
+  if (dirtyCount > 0) {
+    const lbl = dirtyCount === 1
+      ? '⚠ 1 modification en attente de sync'
+      : `⚠ ${dirtyCount} modifications en attente de sync`;
+    setSyncUI('unsynced', lbl);
+  }
+  // Si dirty == 0, on ne touche pas — le dernier saveToDrive a posé "Drive · sync HH:MM".
 }
 
 function handleSyncBtn() {
@@ -1028,6 +1071,7 @@ function initGoogleAuth() {
       if (resp.error) { setSyncUI('error', 'Erreur de connexion Google'); return; }
       driveState.accessToken = resp.access_token;
       driveState.connected = true;
+      driveState.deadTokenAlerted = false; // reconnexion réussie : on pourra ré-alerter en cas de nouvelle expiration
       saveTokenToStorage(resp.access_token);
       setSyncUI('syncing', 'Chargement des données Drive…');
       await loadFromDrive();
@@ -1035,7 +1079,89 @@ function initGoogleAuth() {
   }).requestAccessToken();
 }
 
-function tryRestoreToken() {
+// silentRefreshToken : tente d'obtenir un token frais sans interaction utilisateur,
+// en s'appuyant sur la session Google active dans le navigateur (prompt:'none').
+// Renvoie true si un nouveau token a été stocké et appliqué, false sinon.
+// Utilisé par : tryRestoreToken (boot), ensureFreshToken (pre-flight push),
+// saveToDrive/saveConfigToDrive (sur 401), startHeartbeat (refresh proactif 50min).
+function silentRefreshToken() {
+  return new Promise((resolve) => {
+    if (!window.google || !GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith('VOTRE')) {
+      resolve(false); return;
+    }
+    try {
+      google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID, scope: DRIVE_SCOPE, prompt: 'none',
+        callback: (resp) => {
+          if (resp.error || !resp.access_token) {
+            resolve(false);
+            return;
+          }
+          driveState.accessToken = resp.access_token;
+          driveState.connected = true;
+          driveState.deadTokenAlerted = false; // reconnexion → on pourra ré-alerter plus tard
+          saveTokenToStorage(resp.access_token);
+          resolve(true);
+        }
+      }).requestAccessToken();
+    } catch(e) { resolve(false); }
+  });
+}
+
+// ensureFreshToken : pre-flight check appelé en début de saveToDrive / saveConfigToDrive.
+// Si le token stocké expire dans < 2 min, déclenche un silent refresh AVANT le push.
+// Renvoie true si un token utilisable est en place, false sinon.
+async function ensureFreshToken() {
+  if (!driveState.connected || !driveState.accessToken) return false;
+  const stored = getStoredToken();
+  if (stored && stored.expiry > Date.now() + 120 * 1000) return true;
+  return await silentRefreshToken();
+}
+
+// handleDeadToken : appelé quand on a confirmé que le token n'est plus utilisable
+// (silent refresh échoué OU 401 même après refresh). Marque déconnecté, affiche
+// la barre rouge, et alerte l'utilisateur UNE FOIS via popup bloquant pour
+// empêcher de continuer à éditer en croyant que c'est sync (= bug d'origine).
+// Le flag deadTokenAlerted est reset à la prochaine reconnexion réussie.
+function handleDeadToken() {
+  driveState.connected = false;
+  setSyncUI('error', 'Session Drive expirée — reconnecte-toi');
+  if (!driveState.deadTokenAlerted) {
+    driveState.deadTokenAlerted = true;
+    // Petit délai pour laisser l'UI se mettre à jour avant le popup bloquant.
+    setTimeout(() => {
+      alert('⚠️ Connexion Drive perdue.\n\nTes modifications restent enregistrées en local mais ne sont plus synchronisées vers le Drive.\n\nClique sur "Connecter Drive" en haut de l\'écran pour rétablir la sync.');
+    }, 100);
+  }
+}
+
+// scheduleRetry : programme un nouveau saveToDrive après backoff (5s/15s/60s).
+// Appelé quand un push échoue avec une erreur transitoire (5xx, réseau).
+// Le 401 a son propre flux (silent refresh + retry immédiat dans saveToDrive lui-même).
+// Si une nouvelle modif arrive entre-temps, le scheduleSave normal annulera ce timer.
+function scheduleRetry() {
+  if (driveState.retryAttempt >= SYNC_RETRY_DELAYS.length) return;
+  if (driveState.retryTimer) clearTimeout(driveState.retryTimer);
+  const delay = SYNC_RETRY_DELAYS[driveState.retryAttempt];
+  driveState.retryAttempt++;
+  driveState.retryTimer = setTimeout(() => {
+    driveState.retryTimer = null;
+    if (driveState.connected) saveToDrive();
+  }, delay);
+}
+
+// startHeartbeat : démarre un setInterval qui refresh silencieusement le token
+// toutes les 50 min. Empêche un onglet laissé ouvert plusieurs heures de voir
+// son token expirer côté Google sans signal local. Démarré une fois par session
+// après le premier loadFromDrive réussi.
+function startHeartbeat() {
+  if (driveState.heartbeatTimer) return;
+  driveState.heartbeatTimer = setInterval(() => {
+    if (driveState.connected) silentRefreshToken();
+  }, SYNC_HEARTBEAT_MS);
+}
+
+async function tryRestoreToken() {
   const stored = getStoredToken();
   if (!stored || !window.google || !GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith('VOTRE')) return;
 
@@ -1044,35 +1170,19 @@ function tryRestoreToken() {
     driveState.accessToken = stored.token;
     driveState.connected = true;
     setSyncUI('syncing', 'Restauration session Drive…');
-    loadFromDrive();
+    await loadFromDrive();
     return;
   }
 
   // Token expiré → tentative de refresh silencieux via la session Google active.
-  try {
-    google.accounts.oauth2.initTokenClient({
-      client_id: GOOGLE_CLIENT_ID, scope: DRIVE_SCOPE, prompt: 'none',
-      callback: async (resp) => {
-        if (resp.error || !resp.access_token) {
-          // interaction_required / consent_required = session Google inactive,
-          // pas une vraie erreur. On affiche juste le bouton de connexion.
-          const needsInteraction = ['interaction_required', 'consent_required', 'login_required']
-            .includes(resp.error);
-          if (needsInteraction) {
-            setSyncUI('', 'Drive non connecté');
-          } else {
-            setSyncUI('error', 'Session Drive expirée — reconnecte-toi');
-          }
-          return;
-        }
-        driveState.accessToken = resp.access_token;
-        driveState.connected = true;
-        saveTokenToStorage(resp.access_token);
-        setSyncUI('syncing', 'Restauration session Drive…');
-        await loadFromDrive();
-      }
-    }).requestAccessToken();
-  } catch(e) {}
+  setSyncUI('syncing', 'Restauration session Drive…');
+  const ok = await silentRefreshToken();
+  if (!ok) {
+    // Session Google inactive : pas une vraie erreur, juste pas connecté.
+    setSyncUI('', 'Drive non connecté');
+    return;
+  }
+  await loadFromDrive();
 }
 
 // ── Requêtes Drive (find / load / save) ──
@@ -1130,7 +1240,14 @@ async function loadFromDrive() {
       await saveToDrive();
       setSyncUI('connected', 'Drive connecté · fichier créé');
     }
+    // Tout vient d'être hydraté depuis Drive : pas de pending modif locale.
+    driveState.dirtyKeys.clear();
+    driveState.dirtyConfig = false;
+    // Démarre le heartbeat de refresh proactif (50 min) — empêche le token de
+    // dériver silencieusement sur un onglet laissé ouvert plusieurs heures.
+    startHeartbeat();
     renderAllPanels(); renderTabs(); renderOverview();
+    refreshSyncBadge();
   } catch(e) { setSyncUI('error', 'Erreur chargement Drive'); console.error(e); }
 }
 
@@ -1154,11 +1271,32 @@ async function loadConfigFromDrive() {
   } catch(e) { console.error('loadConfigFromDrive', e); }
 }
 
+// saveToDrive : push de la progression complète (toutes semaines + scales + weights)
+// vers fitness_programme_semaine.json. **Garanties critiques** :
+//   1. Pre-flight ensureFreshToken() pour éviter d'envoyer avec un token périmé.
+//   2. Vérification de res.ok après le PATCH/POST — fetch ne rejette PAS sur 4xx/5xx.
+//      C'est l'absence de ce check qui causait la perte silencieuse de données
+//      (l'UI affichait "✓ sync" alors que Drive renvoyait 401/403/5xx).
+//   3. 401 → silent refresh + retry unique. Si ça échoue → handleDeadToken (alert).
+//   4. Erreur transitoire (5xx, réseau) → scheduleRetry avec backoff 5s/15s/60s.
+//   5. Sur 2xx confirmé : retire les clés du dirtyKeys (snapshot pris AVANT l'envoi
+//      pour ne pas toucher aux modifs arrivées pendant l'upload).
+//   6. Payload : getAllLocalData() complet (toutes les semaines de localStorage),
+//      pas l'objet driveState.data incrémental — évite les payloads partiels.
 async function saveToDrive() {
   if (!driveState.connected || !driveState.accessToken) return;
+
+  const fresh = await ensureFreshToken();
+  if (!fresh) { handleDeadToken(); return; }
+
+  // Snapshot des clés dirty AVANT l'envoi : seules ces clés seront retirées du Set
+  // après confirmation 2xx. Les modifs faites pendant l'upload restent à pousser.
+  const dirtySnapshot = new Set(driveState.dirtyKeys);
+
   setSyncUI('syncing', 'Sauvegarde en cours…');
   try {
-    const blob = new Blob([JSON.stringify(driveState.data)], {type:'application/json'});
+    const payload = getAllLocalData();
+    const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
     const form = new FormData();
     const meta = {name: DRIVE_FILENAME, mimeType: 'application/json'};
     form.append('metadata', new Blob([JSON.stringify(meta)], {type:'application/json'}));
@@ -1172,34 +1310,96 @@ async function saveToDrive() {
       res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
         method: 'POST', headers: {Authorization:'Bearer '+driveState.accessToken}, body: form
       });
-      const created = await res.json();
-      driveState.fileId = created.id;
     }
+
+    if (!res.ok) {
+      // 401 = token mort côté serveur Google (peut arriver malgré le pre-flight si Google a révoqué tôt).
+      if (res.status === 401) {
+        const refreshed = await silentRefreshToken();
+        if (refreshed) {
+          // Retry une fois avec le nouveau token. Pas de boucle infinie : si le retry
+          // ressort un 401, le silentRefreshToken du retry échouera (le token vient d'être refresh).
+          return saveToDrive();
+        }
+        handleDeadToken();
+        return;
+      }
+      // 403 (quota), 5xx, etc. → erreur transitoire potentielle.
+      throw new Error(`Drive sync failed: HTTP ${res.status}`);
+    }
+
+    // Succès confirmé 2xx — récupère le fileId si c'était un POST initial.
+    if (!driveState.fileId) {
+      try { const created = await res.json(); driveState.fileId = created.id; } catch(e) {}
+    }
+    // Retire du dirtyKeys uniquement les clés présentes dans le snapshot (pas les nouvelles).
+    dirtySnapshot.forEach(k => driveState.dirtyKeys.delete(k));
+    // Reset du compteur de retry sur succès.
+    driveState.retryAttempt = 0;
+    if (driveState.retryTimer) { clearTimeout(driveState.retryTimer); driveState.retryTimer = null; }
+    // Synchronise driveState.data avec le payload effectivement poussé (pour la lecture).
+    driveState.data = payload;
+
     const t = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
     setSyncUI('connected', `Drive · sync ${t}`);
-  } catch(e) { setSyncUI('error', 'Erreur sauvegarde Drive'); console.error(e); }
+    refreshSyncBadge(); // bascule en 'unsynced' si dirty arrivé pendant l'upload
+  } catch(e) {
+    console.error('saveToDrive', e);
+    setSyncUI('error', 'Erreur sauvegarde Drive');
+    scheduleRetry();
+  }
 }
 
+// saveConfigToDrive : symétrique de saveToDrive pour le fichier fitness_programme_config.json.
+// Mêmes garanties (res.ok check, 401 → silent refresh + retry unique, dead token alert).
+// Pas de retry backoff ici : si le push de config échoue, le prochain saveConfig de
+// l'utilisateur déclenchera un nouveau scheduleSaveConfig. Si rien ne se passe,
+// l'indicateur 'unsynced' reste affiché et l'utilisateur peut cliquer le bouton.
 async function saveConfigToDrive() {
   if (!driveState.connected || !driveState.accessToken) return;
+
+  const fresh = await ensureFreshToken();
+  if (!fresh) { handleDeadToken(); return; }
+
+  const wasDirty = driveState.dirtyConfig;
   try {
     const blob = new Blob([JSON.stringify(LIVE_CONFIG)], {type:'application/json'});
     const form = new FormData();
     const meta = {name: DRIVE_CONFIG_FILENAME, mimeType: 'application/json'};
     form.append('metadata', new Blob([JSON.stringify(meta)], {type:'application/json'}));
     form.append('file', blob);
+    let res;
     if (driveState.configFileId) {
-      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveState.configFileId}?uploadType=multipart`, {
+      res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveState.configFileId}?uploadType=multipart`, {
         method: 'PATCH', headers: {Authorization:'Bearer '+driveState.accessToken}, body: form
       });
     } else {
-      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
         method: 'POST', headers: {Authorization:'Bearer '+driveState.accessToken}, body: form
       });
-      const created = await res.json();
-      driveState.configFileId = created.id;
     }
-  } catch(e) { console.error('saveConfigToDrive', e); }
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        const refreshed = await silentRefreshToken();
+        if (refreshed) return saveConfigToDrive();
+        handleDeadToken();
+        return;
+      }
+      throw new Error(`Config sync failed: HTTP ${res.status}`);
+    }
+
+    if (!driveState.configFileId) {
+      try { const created = await res.json(); driveState.configFileId = created.id; } catch(e) {}
+    }
+    if (wasDirty) driveState.dirtyConfig = false;
+    refreshSyncBadge();
+  } catch(e) {
+    console.error('saveConfigToDrive', e);
+    // Pas de scheduleRetry ici : un retry dépendrait d'une éventuelle fix du quota/serveur,
+    // l'utilisateur verra l'état 'unsynced' et pourra cliquer pour retenter.
+    setSyncUI('error', 'Erreur sauvegarde config Drive');
+  }
 }
 
 // ── Planification de sauvegarde & storage API ──
@@ -1229,7 +1429,11 @@ function saveConfig(newConfig, source) {
   newConfig.meta.source = source || 'user';
   LIVE_CONFIG = newConfig;
   try { localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(newConfig)); } catch(e) { console.error(e); }
-  if (driveState.connected) scheduleSaveConfig();
+  if (driveState.connected) {
+    driveState.dirtyConfig = true;
+    refreshSyncBadge();
+    scheduleSaveConfig();
+  }
   return true;
 }
 
@@ -1305,7 +1509,11 @@ async function forceDownloadFromDrive() {
       }
     });
 
+    // Toutes les données viennent de Drive : plus rien de pending local.
+    driveState.dirtyKeys.clear();
+    driveState.dirtyConfig = false;
     setSyncUI('connected', 'Drive · données restaurées');
+    refreshSyncBadge();
     alert('✅ Données locales restaurées depuis Drive.');
   } catch(e) {
     setSyncUI('error', 'Erreur restauration Drive');
@@ -1331,10 +1539,16 @@ async function forceUploadToDrive() {
   setSyncUI('syncing', 'Envoi vers Drive…');
   try {
     driveState.data = getAllLocalData();
+    // Marquer toutes les clés locales comme dirty pour que saveToDrive les nettoie sur 2xx.
+    Object.keys(driveState.data).forEach(k => {
+      if (k.startsWith('fitness_w')) driveState.dirtyKeys.add(k);
+    });
+    driveState.dirtyConfig = true;
     await saveToDrive();
     await saveConfigToDrive();
     const t = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
     setSyncUI('connected', `Drive · upload forcé ${t}`);
+    refreshSyncBadge();
     alert('✅ Données locales envoyées vers Drive.');
   } catch(e) {
     setSyncUI('error', 'Erreur upload Drive');
@@ -1362,13 +1576,23 @@ function loadData(dayId) {
 function saveChecks(dayId, checks) {
   const k = storageKey(dayId,'checks');
   localStorage.setItem(k, JSON.stringify(checks));
-  if (driveState.connected) { driveState.data[k] = checks; scheduleSave(); }
+  if (driveState.connected) {
+    driveState.data[k] = checks;
+    driveState.dirtyKeys.add(k);
+    refreshSyncBadge(); // bascule la barre en 'unsynced' immédiatement
+    scheduleSave();
+  }
 }
 
 function saveJournal(dayId, journal) {
   const k = storageKey(dayId,'journal');
   localStorage.setItem(k, JSON.stringify(journal));
-  if (driveState.connected) { driveState.data[k] = journal; scheduleSave(); }
+  if (driveState.connected) {
+    driveState.data[k] = journal;
+    driveState.dirtyKeys.add(k);
+    refreshSyncBadge();
+    scheduleSave();
+  }
 }
 
 // ╔══════════════════════════════════════════════╗

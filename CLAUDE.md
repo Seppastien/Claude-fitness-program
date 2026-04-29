@@ -449,15 +449,44 @@ journal = { rating: 1-5, feeling: 'string', note: 'string' }
 - Deux fichiers distincts, tous deux avec scope `drive.file` (accès restreint aux fichiers créés par l'app) :
   - `fitness_programme_semaine.json` — progression (checks + journal par semaine + `EXERCISE_SCALES` + `EXERCISE_WEIGHTS`)
   - `fitness_programme_config.json` — configuration du programme (`LIVE_CONFIG`)
-- Sync progression : debounce 2 s via `scheduleSave` / `saveToDrive`
+- Sync progression : debounce 2 s via `scheduleSave` / `saveToDrive`. **`saveToDrive` pousse systématiquement `getAllLocalData()` complet** (toutes les semaines de localStorage) — pas l'objet incrémental `driveState.data`. Évite les payloads partiels.
 - Sync config : debounce 2 s via `scheduleSaveConfig` / `saveConfigToDrive`
 - Fallback : localStorage si non connecté
 - Au chargement progression : merge localStorage + Drive (`Object.assign({}, local, remote)` — Drive prioritaire), puis hydrate `EXERCISE_SCALES` et `EXERCISE_WEIGHTS` depuis Drive si présents
 - Au chargement config : `loadConfigFromDrive` écrase `LIVE_CONFIG` + miroir localStorage si le fichier Drive passe `isValidConfig` (après `migrateConfig`)
-- Token : stocké en localStorage avec expiry (3500 s ≈ 58 min) via `saveTokenToStorage`. Restauré silencieusement via `tryRestoreToken()` (appelé 800 ms après init) — soit réutilisation directe si encore valide, soit refresh via `prompt:'none'`
+- Token : stocké en localStorage avec expiry (3500 s ≈ 58 min) via `saveTokenToStorage`. Restauré silencieusement via `tryRestoreToken()` (appelé 800 ms après init) — soit réutilisation directe si encore valide, soit refresh via `silentRefreshToken()` (`prompt:'none'`)
 - **Boutons override** dans la barre de sync (visibles uniquement quand connecté) :
   - `forceDownloadFromDrive()` — efface localStorage (progression + scales + weights + config) puis recharge tout depuis Drive. Confirmation requise.
   - `forceUploadToDrive()` — pousse `getAllLocalData()` + `LIVE_CONFIG` vers les deux fichiers Drive. Confirmation requise.
+
+### Robustesse de la sync (anti-perte silencieuse)
+
+Le pipeline a été durci suite à un bug de perte de données (PC localStorage complet, Drive figé sur la dernière journée, téléphone reflétant Drive amputé). La cause racine : `saveToDrive` traitait silencieusement les réponses 401/403/5xx comme des succès parce que `fetch` ne rejette pas sur les statuts HTTP — seulement sur erreur réseau pure.
+
+| Garantie | Mécanisme |
+|----------|-----------|
+| Aucun faux succès | `saveToDrive` / `saveConfigToDrive` vérifient `res.ok` après chaque PATCH/POST |
+| Token expiré côté serveur | Sur 401 → `silentRefreshToken()` + retry unique. Si refresh KO → `handleDeadToken()` |
+| Token bientôt expiré | `ensureFreshToken()` en pré-flight de chaque push (refresh si < 2 min restant) |
+| Erreurs transitoires | `scheduleRetry()` avec backoff 5 s / 15 s / 60 s (3 tentatives max) |
+| Onglet ouvert plusieurs heures | Heartbeat `setInterval` toutes les 50 min (`startHeartbeat()`) — refresh proactif |
+| Visibilité utilisateur | État `'unsynced'` dans `setSyncUI` (badge orange ⚠ + libellé `N modifications en attente`) tant que `dirtyKeys.size + dirtyConfig` > 0 |
+| Alerte non manquable | `handleDeadToken` déclenche un `alert()` bloquant **une fois** par cycle d'expiration (flag `deadTokenAlerted`, reset à la prochaine reconnexion) |
+
+**État interne ajouté à `driveState`** :
+- `dirtyKeys: Set<string>` — clés `fitness_w…` modifiées non confirmées 2xx Drive. Ajout dans `saveChecks`/`saveJournal`. Retrait sur snapshot après 2xx dans `saveToDrive`.
+- `dirtyConfig: boolean` — config modifiée non confirmée. Set par `saveConfig`, reset par `saveConfigToDrive` sur 2xx.
+- `retryTimer`, `retryAttempt` — backoff de retry sur erreur transitoire.
+- `heartbeatTimer` — setInterval du refresh proactif.
+- `deadTokenAlerted` — déjà alerté de la perte de session.
+
+**Flux clé sur un push** :
+1. `saveChecks(...)` → `localStorage.setItem` + `dirtyKeys.add(k)` + `refreshSyncBadge()` (passe en orange) + `scheduleSave()` (debounce 2 s).
+2. Après 2 s, `saveToDrive()` est appelé. Pre-flight : `await ensureFreshToken()`. Si token utilisable, snapshot du `dirtyKeys` actuel.
+3. PATCH multipart avec `getAllLocalData()` complet.
+4. Si `res.ok` → retire le snapshot du `dirtyKeys`, reset `retryAttempt`, `setSyncUI('connected', 'Drive · sync HH:MM')`, puis `refreshSyncBadge()` (orange si une nouvelle modif est arrivée pendant l'upload).
+5. Si `res.status === 401` → `silentRefreshToken()` + retry unique. Si refresh KO → `handleDeadToken()` (rouge + alert).
+6. Sinon (4xx/5xx) → `setSyncUI('error', ...)` + `scheduleRetry()`.
 
 ---
 
@@ -689,6 +718,8 @@ Tout se joue dans l'IIFE `(function init(){…})()` à la fin du `<script>` :
 - **Champ éditable côté admin** : ajouter le contrôle dans `renderAdminEditor`, le handler dans `bindAdminEditorEvents`/`adminApplyFieldEdit`, et toujours appeler `saveConfig(...)` — ne jamais muter `LIVE_CONFIG` directement sans passer par `saveConfig`
 - **Import/export** : le JSON échangé doit passer `isValidConfig` — si on étend le schéma, bumper `version` et mettre à jour `isValidConfig` en conséquence
 - **Schéma `sessions`** : si on ajoute un nouveau bucket (autre que `bureau`/`tele`/`teleMuscu`/`weekend`), penser à `migrateConfig` et au cas correspondant dans `getSessionsForDay`
+- **Toute nouvelle requête Drive (PATCH/POST/PUT)** : DOIT vérifier `res.ok` après le `fetch` et router 401 → `silentRefreshToken()` + retry, autres erreurs → `scheduleRetry()`. **Ne JAMAIS appeler `setSyncUI('connected', ...)` sans avoir validé le statut HTTP.** C'est l'absence de ce check qui causait la perte silencieuse de données. Pattern de référence : `saveToDrive` (~ligne 1284).
+- **Toute nouvelle source de modification (handler qui écrit dans localStorage et veut sync Drive)** : doit ajouter sa clé à `driveState.dirtyKeys` (ou poser `driveState.dirtyConfig = true`) et appeler `refreshSyncBadge()` avant `scheduleSave`/`scheduleSaveConfig`. Sinon le badge ⚠ ne s'allumera pas et l'utilisateur ne saura pas qu'une sync est en attente.
 
 ### Règles fitness (cf. profil utilisateur ci-dessus)
 

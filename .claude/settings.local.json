@@ -52,7 +52,9 @@
       "Bash(git -C C:/GameDev/Claude-fitness-program diff HEAD~1 HEAD -- programme_semaine.html)",
       "Bash(git -C C:/GameDev/Claude-fitness-program log --oneline -20)",
       "Bash(grep -n \"^\\\\s*//\\\\|^\\\\s*/\\\\*\\\\|\\\\*/$\\\\|<!--\" C:/GameDev/Claude-fitness-program/programme_semaine.html)",
-      "Bash(git -C C:/GameDev/Claude-fitness-program diff --stat HEAD)"
+      "Bash(git -C C:/GameDev/Claude-fitness-program diff --stat HEAD)",
+      "Bash(python -m http.server 8765)",
+      "Bash(kill bdbp2yxtr *)"
     ]
   }
 }
