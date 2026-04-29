@@ -39,7 +39,8 @@
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:0}
 
 /* ── TOP NAV ── */
-.topbar{background:var(--text);color:#F4F2ED;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.sticky-header{position:sticky;top:0;z-index:100}
+.topbar{background:var(--text);color:#F4F2ED;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between}
 .topbar-title{font-size:15px;font-weight:600;letter-spacing:-0.3px}
 .topbar-sub{font-size:11px;opacity:.55;font-family:'DM Mono',monospace;margin-top:2px}
 .week-selector{display:flex;align-items:center;gap:10px}
@@ -195,7 +196,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .serie-phase.active-phase{color:var(--tele)}
 
 .serie-info{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);background:var(--surface2);border-radius:6px;padding:5px 10px;white-space:normal;line-height:1.5;display:block;margin-bottom:.4rem}
-.serie-start-all-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;border:1px solid var(--tele);background:var(--tele-bg);color:var(--tele);border-radius:8px;padding:8px 12px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;cursor:pointer;margin-bottom:.5rem;transition:all .15s}
+.serie-start-all-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;border:1px solid var(--tele);background:var(--tele-bg);color:var(--tele);border-radius:10px;padding:16px 14px;min-height:56px;font-family:'DM Mono',monospace;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:.5rem;transition:all .15s}
 .serie-start-all-btn:hover{background:var(--tele);color:white}
 .serie-start-all-btn:disabled{opacity:.5;cursor:not-allowed}
 .serie-start-all-btn:disabled:hover{background:var(--tele-bg);color:var(--tele)}
@@ -342,8 +343,8 @@ body:not(.admin-mode) .admin-container{display:none}
 .tm-time.big{font-size:96px;color:var(--bureau)}
 .tm-time.rest{color:var(--green)}
 .tm-time.paused{opacity:.45}
-.tm-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
-.tm-btn{padding:10px 14px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--text);font-size:12.5px;font-family:inherit;font-weight:500;cursor:pointer;transition:all .15s;flex:1;min-width:96px;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+.tm-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.tm-btn{padding:18px 16px;border-radius:12px;border:1px solid var(--border2);background:var(--surface);color:var(--text);font-size:14px;font-family:inherit;font-weight:500;cursor:pointer;transition:all .15s;flex:1;min-width:108px;min-height:56px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .tm-btn:hover{background:var(--surface2)}
 .tm-btn.tm-pause{background:var(--text);color:var(--bg);border-color:var(--text)}
 .tm-btn.tm-pause:hover{opacity:.85}
@@ -363,34 +364,37 @@ body.admin-mode .timer-modal{display:none !important}
 </head>
 <body>
 
-<!-- ── Topbar : titre + navigation semaine ── -->
-<div class="topbar">
-  <div>
-    <div class="topbar-title">Programme Semaine</div>
-    <div class="topbar-sub" id="week-display">Semaine 0</div>
+<!-- ── Header collant : topbar + sync bar restent fixés en haut au scroll ── -->
+<div class="sticky-header">
+  <!-- ── Topbar : titre + navigation semaine ── -->
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Programme Semaine</div>
+      <div class="topbar-sub" id="week-display">Semaine 0</div>
+    </div>
+    <div class="week-selector">
+      <button class="week-btn" onclick="changeWeek(-1)">‹</button>
+      <span class="week-label" id="week-range-label"></span>
+      <button class="week-btn" onclick="changeWeek(1)">›</button>
+      <button class="admin-toggle" id="admin-toggle" onclick="toggleAdminMode()" title="Mode édition">⚙</button>
+    </div>
   </div>
-  <div class="week-selector">
-    <button class="week-btn" onclick="changeWeek(-1)">‹</button>
-    <span class="week-label" id="week-range-label"></span>
-    <button class="week-btn" onclick="changeWeek(1)">›</button>
-    <button class="admin-toggle" id="admin-toggle" onclick="toggleAdminMode()" title="Mode édition">⚙</button>
-  </div>
-</div>
 
-<!-- ── Barre de sync Google Drive ──
-     - Bouton primaire : "Connecter Drive" (puis "Synchronisé ✓"/"⟳ Sync…"/"Réessayer").
-     - Boutons override (visibles uniquement quand connecté) :
-         ⬇ Drive  → forceDownloadFromDrive : écrase les données locales avec le Drive
-         ⬆ Local  → forceUploadToDrive    : écrase le Drive avec les données locales
-       Les deux demandent confirmation (action irréversible). -->
-<div class="sync-bar" id="sync-bar">
-  <div class="sync-status">
-    <div class="sync-dot" id="sync-dot"></div>
-    <span class="sync-lbl" id="sync-label">Non connecté — données locales uniquement</span>
+  <!-- ── Barre de sync Google Drive ──
+       - Bouton primaire : "Connecter Drive" (puis "Synchronisé ✓"/"⟳ Sync…"/"Réessayer").
+       - Boutons override (visibles uniquement quand connecté) :
+           ⬇ Drive  → forceDownloadFromDrive : écrase les données locales avec le Drive
+           ⬆ Local  → forceUploadToDrive    : écrase le Drive avec les données locales
+         Les deux demandent confirmation (action irréversible). -->
+  <div class="sync-bar" id="sync-bar">
+    <div class="sync-status">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span class="sync-lbl" id="sync-label">Non connecté — données locales uniquement</span>
+    </div>
+    <button class="sync-btn sync-direction" id="sync-download-btn" onclick="forceDownloadFromDrive()" title="Écraser les données locales avec celles du Drive" hidden>⬇ Drive</button>
+    <button class="sync-btn sync-direction" id="sync-upload-btn" onclick="forceUploadToDrive()" title="Écraser le Drive avec les données locales" hidden>⬆ Local</button>
+    <button class="sync-btn primary" id="sync-btn" onclick="handleSyncBtn()">Connecter Drive</button>
   </div>
-  <button class="sync-btn sync-direction" id="sync-download-btn" onclick="forceDownloadFromDrive()" title="Écraser les données locales avec celles du Drive" hidden>⬇ Drive</button>
-  <button class="sync-btn sync-direction" id="sync-upload-btn" onclick="forceUploadToDrive()" title="Écraser le Drive avec les données locales" hidden>⬆ Local</button>
-  <button class="sync-btn primary" id="sync-btn" onclick="handleSyncBtn()">Connecter Drive</button>
 </div>
 
 <!-- ── Vue d'ensemble : rings de progression hebdo ── -->
