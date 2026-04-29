@@ -946,6 +946,18 @@ function getWeekNumber(d) {
   return Math.ceil((((d-onejan)/86400000)+onejan.getDay()+1)/7);
 }
 
+// isPastDay : true si le jour passé est antérieur à aujourd'hui dans la semaine
+// affichée. Sert à replier toutes les sessions des jours passés par défaut.
+function isPastDay(dayId) {
+  if (currentWeekOffset > 0) return false;
+  if (currentWeekOffset < 0) return true;
+  const jsDay = new Date().getDay();
+  const dayMap = [6,0,1,2,3,4,5];
+  const todayIdx = dayMap[jsDay] ?? 0;
+  const dayIdx = LIVE_CONFIG.days.findIndex(d => d.id === dayId);
+  return dayIdx >= 0 && dayIdx < todayIdx;
+}
+
 // ╔══════════════════════════════════════════════╗
 // ║  GOOGLE DRIVE — OAuth2 & persistance         ║
 // ╚══════════════════════════════════════════════╝
@@ -1767,6 +1779,7 @@ function renderDayPanel(day) {
     const targetOpenIdx = sessions.findIndex((s, idx) =>
       idx > lastDoneIdx && s.exercises && !s.exercises.every(ex => checks[ex.id])
     );
+    const dayIsPast = isPastDay(day.id);
     sessions.forEach((s, sIdx) => {
       if (s.isVelo) {
         const isChecked = checks['velo_'+s.veloDir] ? 'checked' : '';
@@ -1789,7 +1802,7 @@ function renderDayPanel(day) {
         </div>`;
       } else if (s.exercises) {
         const allDone = s.exercises.every(ex => checks[ex.id]);
-        const sessionCollapsed = allDone || sIdx !== targetOpenIdx;
+        const sessionCollapsed = dayIsPast || allDone || sIdx !== targetOpenIdx;
 
         // firstOpenExFound : flag one-shot pour ne laisser ouvert que le premier exercice non coché.
         // Tous les exercices cochés ET tous ceux qui suivent le premier ouvert sont repliés.
@@ -2065,6 +2078,17 @@ function toggleEx(dayId, exId, sessionId) {
   updateSessionBadge(dayId, sessionId, checks);
   updateTabCount(dayId);
   renderOverview();
+  // Si cocher cet exercice vient de terminer la session, enchaîne sur la suivante non terminée.
+  if (checks[exId]) {
+    const sessions = getSessionsForDay(dayId);
+    const s = sessions ? sessions.find(s => s.id === sessionId) : null;
+    if (s && s.exercises && s.exercises.every(ex => checks[ex.id])) {
+      const panel = document.getElementById('panel_' + dayId);
+      const sessionCard = panel ? panel.querySelector(`.session-card[data-sid="${sessionId}"]`) : null;
+      if (sessionCard) sessionCard.classList.add('collapsed');
+      advanceToNextSession(panel, sessionCard);
+    }
+  }
 }
 
 function updateSessionBadge(dayId, sessionId, checks) {
@@ -2950,9 +2974,41 @@ function finishWorkPhase(sid) {
   updateTimerModal(sid, 'rest', st.restSec);
 }
 
+// advanceToNextSession : cherche dans le panneau d'un jour la prochaine session
+// (après currentSession, ou la première si null) qui contient au moins un
+// exercice non coché. Si trouvée : replie toutes les autres cartes de session,
+// déplie la cible, déplie son premier exercice non coché et y scrolle.
+// Permet de sauter une session laissée partiellement faite et de continuer
+// avec la suivante non terminée.
+function advanceToNextSession(panel, currentSession) {
+  if (!panel) return;
+  const allSessions = Array.from(panel.querySelectorAll('.session-card'));
+  const startIdx = currentSession ? allSessions.indexOf(currentSession) + 1 : 0;
+  const nextSession = allSessions.slice(startIdx).find(card =>
+    Array.from(card.querySelectorAll('.ex-row')).some(r => !r.classList.contains('checked'))
+  );
+  // Replie tout : ainsi une session précédente laissée ouverte est aussi refermée.
+  allSessions.forEach(card => card.classList.add('collapsed'));
+  if (!nextSession) return;
+  nextSession.classList.remove('collapsed');
+  let firstUnchecked = null;
+  Array.from(nextSession.querySelectorAll('.ex-item')).forEach(item => {
+    const row = item.querySelector('.ex-row');
+    const isChecked = row && row.classList.contains('checked');
+    if (!isChecked && !firstUnchecked) {
+      firstUnchecked = item;
+      item.classList.remove('collapsed');
+    } else {
+      item.classList.add('collapsed');
+    }
+  });
+  if (firstUnchecked) scrollExerciseIntoView(firstUnchecked);
+}
+
 // finalizeExerciseCompletion : appelé après validation de la dernière série (durée ou reps).
 // Replie l'exercice courant après 800 ms puis déplie le suivant.
-// Si aucun suivant (dernier exercice de la séance), replie la carte de session.
+// Si aucun suivant (dernier exercice de la séance), replie la carte de session
+// puis enchaîne sur la prochaine session non terminée du jour.
 function finalizeExerciseCompletion(anchor) {
   if (!anchor) return;
   const exItem = anchor.closest ? anchor.closest('.ex-item') : null;
@@ -2962,9 +3018,12 @@ function finalizeExerciseCompletion(anchor) {
     const next = exItem.nextElementSibling;
     if (next && next.classList.contains('ex-item')) {
       next.classList.remove('collapsed');
+      scrollExerciseIntoView(next);
     } else {
       const sessionCard = exItem.closest('.session-card');
       if (sessionCard) sessionCard.classList.add('collapsed');
+      const panel = sessionCard ? sessionCard.closest('.day-panel') : null;
+      advanceToNextSession(panel, sessionCard);
     }
   }, 800);
 }
@@ -3092,6 +3151,17 @@ function renderSubExoTracker(dayId, ex) {
 // ║  REPLI — Sessions & Exercices                ║
 // ╚══════════════════════════════════════════════╝
 
+// Aligne l'entête d'un exercice juste sous la sticky-header pour faciliter
+// la lecture du descriptif et le lancement des séries pendant la séance.
+function scrollExerciseIntoView(exItem) {
+  if (!exItem) return;
+  const sticky = document.querySelector('.sticky-header');
+  const offset = sticky ? sticky.getBoundingClientRect().height : 0;
+  const rect = exItem.getBoundingClientRect();
+  const targetY = Math.max(0, window.scrollY + rect.top - offset - 8);
+  window.scrollTo({ top: targetY, behavior: 'smooth' });
+}
+
 function toggleSession(event, dayId, sessionId) {
   event.stopPropagation();
   const panel = document.getElementById('panel_' + dayId);
@@ -3103,7 +3173,17 @@ function toggleSession(event, dayId, sessionId) {
 function toggleExCollapse(event, dayId, exId) {
   event.stopPropagation();
   const item = document.getElementById('exitem_' + dayId + '_' + exId);
-  if (item) item.classList.toggle('collapsed');
+  if (!item) return;
+  item.classList.toggle('collapsed');
+  if (!item.classList.contains('collapsed')) {
+    const list = item.parentElement;
+    if (list) {
+      list.querySelectorAll('.ex-item').forEach(other => {
+        if (other !== item) other.classList.add('collapsed');
+      });
+    }
+    scrollExerciseIntoView(item);
+  }
 }
 
 
