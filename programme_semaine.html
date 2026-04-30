@@ -43,6 +43,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .topbar{background:var(--text);color:#F4F2ED;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between}
 .topbar-title{font-size:15px;font-weight:600;letter-spacing:-0.3px}
 .topbar-sub{font-size:11px;opacity:.55;font-family:'DM Mono',monospace;margin-top:2px}
+.topbar-today{font-size:12px;font-family:'DM Mono',monospace;margin-top:3px;color:#F4F2ED;opacity:.7}
+.topbar-today.partial{color:var(--gold);opacity:1}
+.topbar-today.full{color:var(--green);opacity:1;font-weight:600}
 .week-selector{display:flex;align-items:center;gap:10px}
 .week-btn{background:rgba(255,255,255,0.12);border:none;color:#F4F2ED;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:13px;transition:background .15s}
 .week-btn:hover{background:rgba(255,255,255,0.22)}
@@ -371,6 +374,7 @@ body.admin-mode .timer-modal{display:none !important}
     <div>
       <div class="topbar-title">Programme Semaine</div>
       <div class="topbar-sub" id="week-display">Semaine 0</div>
+      <div class="topbar-today" id="topbar-today">—</div>
     </div>
     <div class="week-selector">
       <button class="week-btn" onclick="changeWeek(-1)">‹</button>
@@ -1678,6 +1682,18 @@ function renderOverview() {
     div.onclick = () => switchDay(d.id);
     bar.appendChild(div);
   });
+  updateTopbarToday();
+}
+
+function updateTopbarToday() {
+  const el = document.getElementById('topbar-today');
+  if (!el) return;
+  const today = LIVE_CONFIG.days.find(d => d.id === activeDay);
+  if (!today) { el.textContent = '—'; el.className = 'topbar-today'; return; }
+  const { total, done } = countExercises(activeDay);
+  const pct = total ? Math.round(done / total * 100) : 0;
+  el.textContent = `${today.fullName} · ${pct}% (${done}/${total})`;
+  el.className = 'topbar-today' + (pct === 100 ? ' full' : pct > 0 ? ' partial' : '');
 }
 
 function renderTabs() {
