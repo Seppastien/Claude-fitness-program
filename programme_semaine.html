@@ -1705,6 +1705,7 @@ function switchDay(dayId) {
   // Scroll tab into view
   const tab = document.getElementById('tab_'+dayId);
   if (tab) tab.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+  scrollToActiveSessionOfDay(dayId);
 }
 
 function renderAllPanels() {
@@ -3020,7 +3021,7 @@ function advanceToNextSession(panel, currentCard) {
       item.classList.add('collapsed');
     }
   });
-  if (firstUnchecked) scrollExerciseIntoView(firstUnchecked);
+  scrollExerciseIntoView(nextCard);
 }
 
 // finalizeExerciseCompletion : appelé après validation de la dernière série (durée ou reps).
@@ -3180,6 +3181,24 @@ function scrollExerciseIntoView(exItem) {
   window.scrollTo({ top: targetY, behavior: 'smooth' });
 }
 
+// Aligne l'entête de la première session/vélo non terminée d'un jour juste
+// sous la sticky-header. Appelée au boot, au changement de jour/semaine, et à
+// la sortie du mode admin pour que l'utilisateur retrouve immédiatement la
+// prochaine étape à effectuer sans scroller à la main.
+function scrollToActiveSessionOfDay(dayId) {
+  const panel = document.getElementById('panel_' + dayId);
+  if (!panel) return;
+  const cards = Array.from(panel.querySelectorAll('.session-card, .velo-card'));
+  const isIncomplete = (card) => {
+    if (card.classList.contains('velo-card')) {
+      return !!card.querySelector('.velo-checkbox:not(.checked)');
+    }
+    return Array.from(card.querySelectorAll('.ex-row')).some(r => !r.classList.contains('checked'));
+  };
+  const target = cards.find(isIncomplete);
+  if (target) scrollExerciseIntoView(target);
+}
+
 function toggleSession(event, dayId, sessionId) {
   event.stopPropagation();
   const panel = document.getElementById('panel_' + dayId);
@@ -3215,6 +3234,7 @@ function changeWeek(delta) {
   renderAllPanels();
   renderTabs();
   renderOverview();
+  scrollToActiveSessionOfDay(activeDay);
 }
 
 function updateWeekDisplay() {
@@ -3276,6 +3296,7 @@ function toggleAdminMode() {
   } else {
     // Re-rendre le planning avec la nouvelle config
     renderAllPanels(); renderTabs(); renderOverview();
+    scrollToActiveSessionOfDay(activeDay);
   }
 }
 
@@ -4047,6 +4068,9 @@ function adminResetConfig() {
 //      l'onglet n'est plus visible).
 
 (function init() {
+  // Empêche le navigateur de restaurer la position de scroll au reload : on
+  // veut systématiquement positionner la page sur la session active suivante.
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   loadConfig(); // Doit précéder tout rendu : LIVE_CONFIG est la source de vérité.
   EXERCISE_SCALES = loadScales(); // Scales utilisateur — lus avant tout rendu (helpers scaled*).
   EXERCISE_WEIGHTS = loadWeights(); // Charges (haltères) utilisateur — lues avant tout rendu.
@@ -4059,6 +4083,7 @@ function adminResetConfig() {
   renderOverview();
   bindAdminTreeEvents();
   bindAdminEditorEvents();
+  requestAnimationFrame(() => scrollToActiveSessionOfDay(activeDay));
   setTimeout(tryRestoreToken, 800);
 
   // Wake Lock — empêche la mise en veille de l'écran
