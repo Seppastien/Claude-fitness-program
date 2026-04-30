@@ -351,7 +351,7 @@ body:not(.admin-mode) .admin-container{display:none}
 .tm-btn:hover{background:var(--surface2)}
 .tm-btn.tm-pause{background:var(--text);color:var(--bg);border-color:var(--text)}
 .tm-btn.tm-pause:hover{opacity:.85}
-.tm-btn.tm-skip{color:var(--tele);border-color:rgba(46,110,78,.35)}
+.tm-btn.tm-skip{color:var(--tele);border-color:rgba(46,110,78,.35);flex-basis:100%}
 .tm-btn.tm-skip:hover{background:var(--tele-bg)}
 .tm-btn.tm-reset{color:var(--red);border-color:rgba(184,64,64,.35)}
 .tm-btn.tm-reset:hover{background:#FBEDED}
@@ -426,8 +426,8 @@ body.admin-mode .timer-modal{display:none !important}
     <div class="tm-next" id="tm-next"></div>
     <div class="tm-actions">
       <button type="button" class="tm-btn tm-pause" id="tm-pause" onclick="pauseModalTimer()">⏸ Pause</button>
-      <button type="button" class="tm-btn tm-skip" id="tm-skip" onclick="skipModalTimer()">⏭ Sauter</button>
       <button type="button" class="tm-btn tm-reset" id="tm-reset" onclick="resetModalTimer()">⏹ Reset</button>
+      <button type="button" class="tm-btn tm-skip" id="tm-skip" onclick="skipModalTimer()">⏭ Sauter</button>
       <button type="button" class="tm-btn tm-validate" id="tm-validate" onclick="validateRepSerie()" style="display:none">✓ Valider</button>
       <button type="button" class="tm-btn tm-close" id="tm-close" onclick="closeRepExecModal()" style="display:none">✕ Fermer</button>
     </div>
