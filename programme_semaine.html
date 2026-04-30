@@ -1958,7 +1958,6 @@ function onExerciseScaleInput(dayId, exId, rawValue) {
 
 function onExerciseScaleChange(dayId, exId, rawValue) {
   const pct = saveScale(exId, parseInt(rawValue, 10));
-  // Récupère l'exercice depuis LIVE_CONFIG pour recalculer l'affichage.
   const sessions = getSessionsForDay(dayId);
   if (!sessions) return;
   let exObj = null;
@@ -1969,19 +1968,16 @@ function onExerciseScaleChange(dayId, exId, rawValue) {
   }
   if (!exObj) return;
 
-  // 1) Reps label sur la carte
+  // Refresh ciblé : reps label, badge, value label, tracker (markup remplacé), et modale si active.
   const repsEl = document.getElementById(`sreps_${dayId}_${exId}`);
   if (repsEl) repsEl.textContent = scaledRepsString(exObj);
-  // 2) Badge ×NN%
   const badgeEl = document.getElementById(`sbadge_${dayId}_${exId}`);
   if (badgeEl) {
     badgeEl.textContent = `×${pct}%`;
     badgeEl.style.display = pct !== 100 ? '' : 'none';
   }
-  // 3) Value label sous le slider
   const valEl = document.getElementById(`sval_${dayId}_${exId}`);
   if (valEl) valEl.textContent = pct + '%';
-  // 4) Tracker de séries : remplace le markup (les onclick portent la nouvelle durée)
   const tracker = document.getElementById(`st_${dayId}_${exId}`);
   if (tracker && tracker.parentNode) {
     const newHtml = exObj.subExos ? renderSubExoTracker(dayId, exObj)
@@ -1990,7 +1986,7 @@ function onExerciseScaleChange(dayId, exId, rawValue) {
     const wrapper = document.createElement('div');
     wrapper.innerHTML = newHtml;
     tracker.parentNode.replaceChild(wrapper.firstElementChild, tracker);
-    // Restaure l'état "done" des séries cochées côté checks
+    // Restaure l'état "done" des séries déjà cochées (sinon le re-render les efface).
     const { checks } = loadData(dayId);
     if (checks[exId]) {
       const newTracker = document.getElementById(`st_${dayId}_${exId}`);
@@ -1999,7 +1995,6 @@ function onExerciseScaleChange(dayId, exId, rawValue) {
       });
     }
   }
-  // 5) Modale timer active pour cet exercice : rafraîchir reps + badge échelle
   if (modalState.active && modalState.sid && modalState.sid.startsWith(`${dayId}_${exId}_`)) {
     const tmReps = document.getElementById('tm-reps');
     if (tmReps) tmReps.textContent = scaledRepsString(exObj);
@@ -2030,7 +2025,7 @@ function onExerciseWeightChange(dayId, exId, delta) {
   const defaultKg = getDefaultWeight(exObj);
   const newKg = saveWeight(exId, currentKg + delta, defaultKg);
 
-  // 1) Valeur affichée sous les boutons
+  // Refresh ciblé : valeur sous les boutons, état disabled, charge-tag de la carte, et modale si active.
   const valEl = document.getElementById(`swval_${dayId}_${exId}`);
   if (valEl) {
     if (newKg === 0) {
@@ -2041,18 +2036,15 @@ function onExerciseWeightChange(dayId, exId, delta) {
       valEl.classList.remove('muted');
     }
   }
-  // 2) Disabled state des boutons
   const minBtn = document.getElementById(`swbtn_minus_${dayId}_${exId}`);
   if (minBtn) minBtn.disabled = (newKg <= WEIGHT_MIN);
   const maxBtn = document.getElementById(`swbtn_plus_${dayId}_${exId}`);
   if (maxBtn) maxBtn.disabled = (newKg >= WEIGHT_MAX);
-  // 3) Charge-tag à droite de la carte
   const tagEl = document.getElementById(`schg_${dayId}_${exId}`);
   if (tagEl) {
     tagEl.textContent = chargeDisplay(exObj);
     tagEl.classList.toggle('modified', isWeightModified(exObj));
   }
-  // 4) Modale timer si active pour cet exercice
   if (modalState.active && modalState.sid && modalState.sid.startsWith(`${dayId}_${exId}_`)) {
     updateModalCharge(exObj);
   }
@@ -2083,7 +2075,6 @@ function toggleEx(dayId, exId, sessionId) {
   if (!row) return;
   row.classList.toggle('checked', checks[exId]);
   row.querySelector('.ex-check').textContent = checks[exId]?'✓':'';
-  // Sync all series checks with the exercise state
   const tracker = document.getElementById('st_' + dayId + '_' + exId);
   if (tracker) {
     tracker.querySelectorAll('.serie-check').forEach(chk => {
@@ -2091,7 +2082,6 @@ function toggleEx(dayId, exId, sessionId) {
       chk.textContent = checks[exId] ? '✓' : '';
     });
   }
-  // Update session done badge
   updateSessionBadge(dayId, sessionId, checks);
   updateTabCount(dayId);
   renderOverview();
