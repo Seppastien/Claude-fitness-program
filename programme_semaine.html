@@ -2115,12 +2115,19 @@ function updateSessionBadge(dayId, sessionId, checks) {
 
 function toggleVelo(dayId, dir, el) {
   const { checks } = loadData(dayId);
+  const wasChecked = !!checks['velo_'+dir];
   checks['velo_'+dir] = !checks['velo_'+dir];
   saveChecks(dayId, checks);
   el.classList.toggle('checked', checks['velo_'+dir]);
   el.textContent = checks['velo_'+dir]?'✓':'';
   updateTabCount(dayId);
   renderOverview();
+  // Avance à la prochaine étape uniquement sur la transition false→true.
+  if (!wasChecked) {
+    const veloCard = el.closest('.velo-card');
+    const panel = document.getElementById('panel_'+dayId);
+    advanceToNextSession(panel, veloCard);
+  }
 }
 
 function updateTabCount(dayId) {
@@ -2974,25 +2981,36 @@ function finishWorkPhase(sid) {
   updateTimerModal(sid, 'rest', st.restSec);
 }
 
-// advanceToNextSession : cherche dans le panneau d'un jour la prochaine session
-// (après currentSession, ou la première si null) qui contient au moins un
-// exercice non coché. Si trouvée : replie toutes les autres cartes de session,
-// déplie la cible, déplie son premier exercice non coché et y scrolle.
+// advanceToNextSession : cherche dans le panneau d'un jour la prochaine étape
+// (session de musculation OU trajet vélo, après currentCard ou la première si
+// null) qui n'est pas encore terminée. Si trouvée :
+//   - replie toutes les .session-card (les .velo-card n'ont pas d'état collapsed)
+//   - si la cible est une session : déplie + ouvre son premier exercice non
+//     coché + scroll
+//   - si la cible est un vélo : se contente de scroller dessus
 // Permet de sauter une session laissée partiellement faite et de continuer
-// avec la suivante non terminée.
-function advanceToNextSession(panel, currentSession) {
+// avec la suivante non terminée. Les vélos sont des étapes à part entière.
+function advanceToNextSession(panel, currentCard) {
   if (!panel) return;
-  const allSessions = Array.from(panel.querySelectorAll('.session-card'));
-  const startIdx = currentSession ? allSessions.indexOf(currentSession) + 1 : 0;
-  const nextSession = allSessions.slice(startIdx).find(card =>
-    Array.from(card.querySelectorAll('.ex-row')).some(r => !r.classList.contains('checked'))
-  );
-  // Replie tout : ainsi une session précédente laissée ouverte est aussi refermée.
-  allSessions.forEach(card => card.classList.add('collapsed'));
-  if (!nextSession) return;
-  nextSession.classList.remove('collapsed');
+  const cards = Array.from(panel.querySelectorAll('.session-card, .velo-card'));
+  const startIdx = currentCard ? cards.indexOf(currentCard) + 1 : 0;
+  const isIncomplete = (card) => {
+    if (card.classList.contains('velo-card')) {
+      return !!card.querySelector('.velo-checkbox:not(.checked)');
+    }
+    return Array.from(card.querySelectorAll('.ex-row')).some(r => !r.classList.contains('checked'));
+  };
+  const nextCard = cards.slice(startIdx).find(isIncomplete);
+  // Replie uniquement les sessions ; les vélos restent visibles tels quels.
+  cards.forEach(card => { if (card.classList.contains('session-card')) card.classList.add('collapsed'); });
+  if (!nextCard) return;
+  if (nextCard.classList.contains('velo-card')) {
+    scrollExerciseIntoView(nextCard);
+    return;
+  }
+  nextCard.classList.remove('collapsed');
   let firstUnchecked = null;
-  Array.from(nextSession.querySelectorAll('.ex-item')).forEach(item => {
+  Array.from(nextCard.querySelectorAll('.ex-item')).forEach(item => {
     const row = item.querySelector('.ex-row');
     const isChecked = row && row.classList.contains('checked');
     if (!isChecked && !firstUnchecked) {
